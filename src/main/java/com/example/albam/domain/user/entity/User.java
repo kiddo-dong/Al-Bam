@@ -41,6 +41,8 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false)
     private LocalDateTime termsAgreedAt;
 
+    private String profileImageUrl;
+
     public User(String email, String password, String name, String phone, LocalDate birthDate,
             LocalDateTime termsAgreedAt) {
         this.email = email;
@@ -58,5 +60,9 @@ public class User extends BaseTimeEntity {
     public void updateProfile(String name, String phone) {
         this.name = name;
         this.phone = phone;
+    }
+
+    public void changeProfileImageUrl(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
     }
 }

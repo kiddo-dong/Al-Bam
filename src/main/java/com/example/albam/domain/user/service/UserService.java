@@ -7,17 +7,22 @@ import com.example.albam.domain.user.entity.User;
 import com.example.albam.domain.user.repository.UserRepository;
 import com.example.albam.global.exception.ConflictException;
 import com.example.albam.global.exception.NotFoundException;
+import com.example.albam.global.file.S3Uploader;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class UserService {
 
+    private static final String PROFILE_IMAGE_DIRECTORY = "profile-images";
+
     private final UserRepository userRepository;
     private final StoreMemberRepository storeMemberRepository;
+    private final S3Uploader s3Uploader;
 
     public UserResponse getMe(Long userId) {
         return UserResponse.from(getUser(userId));
@@ -38,7 +43,27 @@ public class UserService {
         if (storeMemberRepository.existsByUserId(userId)) {
             throw new ConflictException("소속된 매장이 있으면 탈퇴할 수 없습니다. 매장을 먼저 나가거나 삭제해 주세요.");
         }
-        userRepository.deleteById(userId);
+        User user = getUser(userId);
+        s3Uploader.delete(user.getProfileImageUrl());
+        userRepository.delete(user);
+    }
+
+    @Transactional
+    public UserResponse updateProfileImage(Long userId, MultipartFile image) {
+        User user = getUser(userId);
+        String previousImageUrl = user.getProfileImageUrl();
+        String uploadedUrl = s3Uploader.upload(image, PROFILE_IMAGE_DIRECTORY);
+        user.changeProfileImageUrl(uploadedUrl);
+        s3Uploader.delete(previousImageUrl);
+        return UserResponse.from(user);
+    }
+
+    @Transactional
+    public UserResponse deleteProfileImage(Long userId) {
+        User user = getUser(userId);
+        s3Uploader.delete(user.getProfileImageUrl());
+        user.changeProfileImageUrl(null);
+        return UserResponse.from(user);
     }
 
     private User getUser(Long userId) {
