@@ -3,13 +3,17 @@ package com.example.albam.domain.user.service;
 import com.example.albam.domain.user.dto.LoginRequest;
 import com.example.albam.domain.user.dto.SignupRequest;
 import com.example.albam.domain.user.dto.TokenResponse;
+import com.example.albam.domain.user.entity.AuthProvider;
 import com.example.albam.domain.user.entity.User;
+import com.example.albam.domain.user.oauth.OAuthUserInfo;
+import com.example.albam.domain.user.oauth.OAuthUserInfoFetcher;
 import com.example.albam.domain.user.repository.UserRepository;
 import com.example.albam.global.exception.ConflictException;
 import com.example.albam.global.exception.ErrorCode;
 import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.security.JwtTokenProvider;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -26,6 +30,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
+    private final List<OAuthUserInfoFetcher> oAuthUserInfoFetchers;
 
     @Transactional
     public Long signup(SignupRequest request) {
@@ -55,11 +60,37 @@ public class AuthService {
     }
 
     public TokenResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.email(), request.password()));
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new InvalidRequestException(ErrorCode.UNAUTHORIZED.getDefaultMessage()));
+        if (user.getProvider() != AuthProvider.LOCAL) {
+            throw new InvalidRequestException(
+                    user.getProvider() + " 소셜 로그인으로 가입된 계정입니다. 소셜 로그인을 이용해 주세요.");
+        }
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.email(), request.password()));
         return issueTokens(user);
+    }
+
+    @Transactional
+    public TokenResponse oauthLogin(AuthProvider provider, String accessToken) {
+        OAuthUserInfo userInfo = resolveFetcher(provider).fetch(accessToken);
+        User user = userRepository.findByProviderAndProviderId(provider, userInfo.providerId())
+                .orElseGet(() -> registerOAuthUser(provider, userInfo));
+        return issueTokens(user);
+    }
+
+    private User registerOAuthUser(AuthProvider provider, OAuthUserInfo userInfo) {
+        if (userRepository.existsByEmail(userInfo.email())) {
+            throw new ConflictException("이미 다른 방식으로 가입된 이메일입니다.");
+        }
+        return userRepository.save(new User(userInfo.email(), userInfo.name(), provider, userInfo.providerId()));
+    }
+
+    private OAuthUserInfoFetcher resolveFetcher(AuthProvider provider) {
+        return oAuthUserInfoFetchers.stream()
+                .filter(fetcher -> fetcher.getProvider() == provider)
+                .findFirst()
+                .orElseThrow(() -> new InvalidRequestException("지원하지 않는 로그인 방식입니다."));
     }
 
     public TokenResponse refresh(String refreshToken) {
