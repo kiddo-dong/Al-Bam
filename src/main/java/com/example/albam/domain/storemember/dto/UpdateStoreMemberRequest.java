@@ -9,6 +9,7 @@ public record UpdateStoreMemberRequest(
         MemberRole role,
         Integer hourlyWage,
         MemberStatus status,
-        Set<DayOfWeek> availableDays
+        Set<DayOfWeek> availableDays,
+        DayOfWeek weeklyHolidayDay
 ) {
 }

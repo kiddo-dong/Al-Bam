@@ -12,6 +12,7 @@ public record UpdateStoreRequest(
         String businessRegistrationNumber,
         StoreCategory category,
         Map<DayOfWeek, BusinessHourRequest> businessHours,
-        BreakPolicy breakPolicy
+        BreakPolicy breakPolicy,
+        Boolean smallBusiness
 ) {
 }

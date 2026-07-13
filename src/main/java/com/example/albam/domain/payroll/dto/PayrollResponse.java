@@ -10,6 +10,7 @@ public record PayrollResponse(
         long regularPay,
         long overtimePay,
         long nightPay,
+        long holidayWorkPay,
         long weeklyHolidayPay,
         long totalPay
 ) {
@@ -22,6 +23,7 @@ public record PayrollResponse(
                 payroll.getRegularPay(),
                 payroll.getOvertimePay(),
                 payroll.getNightPay(),
+                payroll.getHolidayWorkPay(),
                 payroll.getWeeklyHolidayPay(),
                 payroll.getTotalPay()
         );

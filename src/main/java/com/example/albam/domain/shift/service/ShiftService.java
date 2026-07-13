@@ -49,6 +49,7 @@ public class ShiftService {
         int breakMinutes = resolveBreakMinutes(target.getStore(), request.startTime(), request.endTime(),
                 request.breakMinutes());
         validateAvailability(target, request.workDate(), request.startTime(), request.endTime());
+        validateMinorProtection(target, request.workDate(), request.startTime(), request.endTime(), breakMinutes);
         validateNoOverlap(target, request.workDate(), request.startTime(), request.endTime(), null);
         validateWeeklyLimit(target, request.workDate(), request.startTime(), request.endTime(), breakMinutes, null);
         Shift shift = shiftRepository.save(
@@ -79,6 +80,7 @@ public class ShiftService {
             }
             try {
                 validateAvailability(target, date, request.startTime(), request.endTime());
+                validateMinorProtection(target, date, request.startTime(), request.endTime(), breakMinutes);
                 validateNoOverlap(target, date, request.startTime(), request.endTime(), null);
                 validateWeeklyLimit(target, date, request.startTime(), request.endTime(), breakMinutes, null);
                 Shift shift = shiftRepository.save(
@@ -115,6 +117,8 @@ public class ShiftService {
                 request.breakMinutes());
         validateAvailability(member, request.workDate(), request.startTime(), request.endTime());
         if (request.status() != ShiftStatus.CANCELED) {
+            validateMinorProtection(member, request.workDate(), request.startTime(), request.endTime(),
+                    breakMinutes);
             validateNoOverlap(member, request.workDate(), request.startTime(), request.endTime(), shiftId);
             validateWeeklyLimit(member, request.workDate(), request.startTime(), request.endTime(),
                     breakMinutes, shiftId);
@@ -168,9 +172,18 @@ public class ShiftService {
                 spanMinutes(startTime, endTime), requested);
     }
 
-    /** 해당 주(월~일, workDate 기준)의 스케줄 합산 근무시간이 주 52시간을 넘으면 거부한다. */
+    /**
+     * 해당 주(월~일, workDate 기준)의 스케줄 합산 근무시간 상한을 검증한다.
+     * 연소근로자는 주 35시간, 성인은 주 52시간이며, 5인 미만 사업장의 성인은 상한이 적용되지 않는다.
+     */
     private void validateWeeklyLimit(StoreMember member, LocalDate workDate, LocalTime startTime,
             LocalTime endTime, int breakMinutes, Long excludeShiftId) {
+        boolean minor = LaborStandards.isMinor(member.getUser().getBirthDate(), workDate);
+        if (!minor && member.getStore().isSmallBusiness()) {
+            return;
+        }
+        int capMinutes = minor ? LaborStandards.MINOR_MAX_WEEKLY_WORK_MINUTES
+                : LaborStandards.MAX_WEEKLY_WORK_MINUTES;
         LocalDate weekStart = workDate.with(DayOfWeek.MONDAY);
         LocalDate weekEnd = weekStart.plusDays(6);
         long weeklyMinutes = spanMinutes(startTime, endTime) - breakMinutes;
@@ -182,10 +195,30 @@ public class ShiftService {
             }
             weeklyMinutes += existing.workMinutes();
         }
-        if (weeklyMinutes > LaborStandards.MAX_WEEKLY_WORK_MINUTES) {
+        if (weeklyMinutes > capMinutes) {
             throw new InvalidRequestException(
-                    "해당 주의 스케줄 합계가 주 52시간을 초과합니다. (현재 배정 시 " + weeklyMinutes / 60 + "시간 "
-                            + weeklyMinutes % 60 + "분)");
+                    "해당 주의 스케줄 합계가 주 " + capMinutes / 60 + "시간 상한을 초과합니다. (현재 배정 시 "
+                            + weeklyMinutes / 60 + "시간 " + weeklyMinutes % 60 + "분)");
+        }
+    }
+
+    /** 연소근로자(18세 미만) 보호: 1일 7시간 초과, 야간(22:00~06:00)·주휴일 근로 스케줄을 금지한다. */
+    private void validateMinorProtection(StoreMember member, LocalDate workDate, LocalTime startTime,
+            LocalTime endTime, int breakMinutes) {
+        if (!LaborStandards.isMinor(member.getUser().getBirthDate(), workDate)) {
+            return;
+        }
+        long workMinutes = spanMinutes(startTime, endTime) - breakMinutes;
+        if (workMinutes > LaborStandards.MINOR_MAX_DAILY_WORK_MINUTES) {
+            throw new InvalidRequestException("연소근로자(18세 미만)는 1일 7시간을 초과해 근무할 수 없습니다.");
+        }
+        boolean touchesNight = endTime.isBefore(startTime)
+                || startTime.isBefore(LocalTime.of(6, 0)) || endTime.isAfter(LocalTime.of(22, 0));
+        if (touchesNight) {
+            throw new InvalidRequestException("연소근로자(18세 미만)는 야간(22:00~06:00)에 근무할 수 없습니다.");
+        }
+        if (member.getWeeklyHolidayDay() != null && workDate.getDayOfWeek() == member.getWeeklyHolidayDay()) {
+            throw new InvalidRequestException("연소근로자(18세 미만)는 주휴일에 근무할 수 없습니다.");
         }
     }
 

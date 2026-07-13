@@ -47,6 +47,10 @@ public class Payroll extends BaseTimeEntity {
     @Column(nullable = false)
     private long nightPay;
 
+    /** 주휴일 근로에 대한 가산수당 (기본급과 별도). */
+    @Column(nullable = false)
+    private long holidayWorkPay;
+
     @Column(nullable = false)
     private long weeklyHolidayPay;
 
@@ -63,12 +67,14 @@ public class Payroll extends BaseTimeEntity {
         this.generatedAt = LocalDateTime.now();
     }
 
-    public void applyResult(long regularPay, long overtimePay, long nightPay, long weeklyHolidayPay) {
+    public void applyResult(long regularPay, long overtimePay, long nightPay, long holidayWorkPay,
+            long weeklyHolidayPay) {
         this.regularPay = regularPay;
         this.overtimePay = overtimePay;
         this.nightPay = nightPay;
+        this.holidayWorkPay = holidayWorkPay;
         this.weeklyHolidayPay = weeklyHolidayPay;
-        this.totalPay = regularPay + overtimePay + nightPay + weeklyHolidayPay;
+        this.totalPay = regularPay + overtimePay + nightPay + holidayWorkPay + weeklyHolidayPay;
         this.generatedAt = LocalDateTime.now();
     }
 }

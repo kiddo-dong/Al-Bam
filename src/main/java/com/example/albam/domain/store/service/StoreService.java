@@ -46,7 +46,7 @@ public class StoreService {
         Store store = storeRepository.save(
                 new Store(request.name(), request.address(), request.businessRegistrationNumber(),
                         request.category(), toBusinessHours(request.businessHours()), generateUniqueInviteCode(),
-                        request.breakPolicy()));
+                        request.breakPolicy(), request.smallBusiness()));
         storeMemberRepository.save(new StoreMember(store, user, MemberRole.OWNER, OWNER_DEFAULT_WAGE));
         return StoreResponse.from(store);
     }
@@ -81,7 +81,8 @@ public class StoreService {
         storeAuthorizationService.requireOwner(storeId, userId);
         Store store = getStoreEntity(storeId);
         store.update(request.name(), request.address(), request.businessRegistrationNumber(),
-                request.category(), toBusinessHours(request.businessHours()), request.breakPolicy());
+                request.category(), toBusinessHours(request.businessHours()), request.breakPolicy(),
+                request.smallBusiness());
         return StoreResponse.from(store);
     }
 

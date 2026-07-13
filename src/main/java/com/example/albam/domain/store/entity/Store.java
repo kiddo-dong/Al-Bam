@@ -55,8 +55,13 @@ public class Store extends BaseTimeEntity {
     @Column(nullable = false)
     private BreakPolicy breakPolicy;
 
+    /** 상시 근로자 5인 미만 사업장 여부. 5인 미만은 연장·야간·휴일 가산수당과 주 52시간 상한이 적용되지 않는다. */
+    @Column(nullable = false)
+    private boolean smallBusiness;
+
     public Store(String name, String address, String businessRegistrationNumber, StoreCategory category,
-            Map<DayOfWeek, BusinessHour> businessHours, String inviteCode, BreakPolicy breakPolicy) {
+            Map<DayOfWeek, BusinessHour> businessHours, String inviteCode, BreakPolicy breakPolicy,
+            Boolean smallBusiness) {
         this.name = name;
         this.address = address;
         this.businessRegistrationNumber = businessRegistrationNumber;
@@ -66,6 +71,7 @@ public class Store extends BaseTimeEntity {
         }
         this.inviteCode = inviteCode;
         this.breakPolicy = breakPolicy == null ? BreakPolicy.STATUTORY : breakPolicy;
+        this.smallBusiness = Boolean.TRUE.equals(smallBusiness);
     }
 
     public void changeInviteCode(String inviteCode) {
@@ -73,7 +79,7 @@ public class Store extends BaseTimeEntity {
     }
 
     public void update(String name, String address, String businessRegistrationNumber, StoreCategory category,
-            Map<DayOfWeek, BusinessHour> businessHours, BreakPolicy breakPolicy) {
+            Map<DayOfWeek, BusinessHour> businessHours, BreakPolicy breakPolicy, Boolean smallBusiness) {
         this.name = name;
         this.address = address;
         this.businessRegistrationNumber = businessRegistrationNumber;
@@ -83,5 +89,6 @@ public class Store extends BaseTimeEntity {
             this.businessHours.putAll(businessHours);
         }
         this.breakPolicy = breakPolicy == null ? BreakPolicy.STATUTORY : breakPolicy;
+        this.smallBusiness = Boolean.TRUE.equals(smallBusiness);
     }
 }

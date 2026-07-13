@@ -14,13 +14,14 @@ public record StoreResponse(
         String businessRegistrationNumber,
         StoreCategory category,
         Map<DayOfWeek, BusinessHourResponse> businessHours,
-        BreakPolicy breakPolicy
+        BreakPolicy breakPolicy,
+        boolean smallBusiness
 ) {
     public static StoreResponse from(Store store) {
         Map<DayOfWeek, BusinessHourResponse> businessHours = store.getBusinessHours().entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> BusinessHourResponse.from(entry.getValue())));
         return new StoreResponse(store.getId(), store.getName(), store.getAddress(),
                 store.getBusinessRegistrationNumber(), store.getCategory(), businessHours,
-                store.getBreakPolicy());
+                store.getBreakPolicy(), store.isSmallBusiness());
     }
 }

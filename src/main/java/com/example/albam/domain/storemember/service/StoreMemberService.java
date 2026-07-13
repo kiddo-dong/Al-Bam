@@ -55,6 +55,9 @@ public class StoreMemberService {
         if (request.availableDays() != null) {
             target.changeAvailableDays(request.availableDays());
         }
+        if (request.weeklyHolidayDay() != null) {
+            target.changeWeeklyHolidayDay(request.weeklyHolidayDay());
+        }
         return StoreMemberResponse.from(target);
     }
 

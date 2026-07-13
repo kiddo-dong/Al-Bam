@@ -63,6 +63,10 @@ public class StoreMember extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     private Set<DayOfWeek> availableDays = new HashSet<>();
 
+    /** 주휴일(유급휴일). 이 요일 근무는 휴일근로 가산 대상이다. 미지정 시 휴일근로 가산 없음. */
+    @Enumerated(EnumType.STRING)
+    private DayOfWeek weeklyHolidayDay;
+
     public StoreMember(Store store, User user, MemberRole role, int hourlyWage) {
         this.store = store;
         this.user = user;
@@ -89,6 +93,10 @@ public class StoreMember extends BaseTimeEntity {
         if (availableDays != null) {
             this.availableDays.addAll(availableDays);
         }
+    }
+
+    public void changeWeeklyHolidayDay(DayOfWeek weeklyHolidayDay) {
+        this.weeklyHolidayDay = weeklyHolidayDay;
     }
 
     public boolean isOwnerOrManager() {

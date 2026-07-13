@@ -1,6 +1,8 @@
 package com.example.albam.global.labor;
 
 import com.example.albam.global.exception.InvalidRequestException;
+import java.time.LocalDate;
+import java.time.Period;
 
 /** 근로기준법·최저임금법의 수치 기준을 한곳에 모아둔다. */
 public final class LaborStandards {
@@ -17,7 +19,18 @@ public final class LaborStandards {
     /** 1일 법정 기준 근로시간. 이를 초과하는 근로는 연장근로다. */
     public static final int STANDARD_DAILY_HOURS = 8;
 
+    /** 연소근로자(18세 미만)의 1일 최대 근로시간 (분). 당사자 합의 연장(1일 1시간)은 미지원. */
+    public static final int MINOR_MAX_DAILY_WORK_MINUTES = 7 * 60;
+
+    /** 연소근로자(18세 미만)의 1주 최대 근로시간 (분). */
+    public static final int MINOR_MAX_WEEKLY_WORK_MINUTES = 35 * 60;
+
     private LaborStandards() {
+    }
+
+    /** 근로기준법상 연소근로자(만 18세 미만) 여부. 생년월일 미입력(소셜 가입 등) 시 성인으로 간주한다. */
+    public static boolean isMinor(LocalDate birthDate, LocalDate onDate) {
+        return birthDate != null && Period.between(birthDate, onDate).getYears() < 18;
     }
 
     /** 근로기준법 제54조: 근로시간 4시간 이상이면 30분, 8시간 이상이면 1시간 이상의 휴게를 줘야 한다. */

@@ -16,7 +16,8 @@ public record StoreMemberResponse(
         int hourlyWage,
         MemberStatus status,
         LocalDateTime joinedAt,
-        Set<DayOfWeek> availableDays
+        Set<DayOfWeek> availableDays,
+        DayOfWeek weeklyHolidayDay
 ) {
     public static StoreMemberResponse from(StoreMember member) {
         return new StoreMemberResponse(
@@ -28,7 +29,8 @@ public record StoreMemberResponse(
                 member.getHourlyWage(),
                 member.getStatus(),
                 member.getJoinedAt(),
-                member.getAvailableDays()
+                member.getAvailableDays(),
+                member.getWeeklyHolidayDay()
         );
     }
 }
