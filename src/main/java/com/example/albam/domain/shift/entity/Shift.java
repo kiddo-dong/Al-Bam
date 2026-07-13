@@ -64,9 +64,14 @@ public class Shift extends BaseTimeEntity {
         this.status = status;
     }
 
+    /** 자정을 넘기는 야간 근무(예: 23:00~06:00)는 종료 시각이 시작 시각보다 이르게 표현되므로 허용한다. */
+    public boolean isOvernight() {
+        return endTime.isBefore(startTime);
+    }
+
     private void validateTimeRange(LocalTime startTime, LocalTime endTime) {
-        if (!endTime.isAfter(startTime)) {
-            throw new InvalidRequestException("종료 시각은 시작 시각 이후여야 합니다.");
+        if (startTime.equals(endTime)) {
+            throw new InvalidRequestException("시작 시각과 종료 시각이 같을 수 없습니다.");
         }
     }
 }
