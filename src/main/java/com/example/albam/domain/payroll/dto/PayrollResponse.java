@@ -12,6 +12,7 @@ public record PayrollResponse(
         long nightPay,
         long holidayWorkPay,
         long weeklyHolidayPay,
+        long leavePay,
         long totalPay
 ) {
     public static PayrollResponse from(Payroll payroll) {
@@ -25,6 +26,7 @@ public record PayrollResponse(
                 payroll.getNightPay(),
                 payroll.getHolidayWorkPay(),
                 payroll.getWeeklyHolidayPay(),
+                payroll.getLeavePay(),
                 payroll.getTotalPay()
         );
     }

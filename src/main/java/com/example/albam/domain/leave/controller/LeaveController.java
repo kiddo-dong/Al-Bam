@@ -1,0 +1,46 @@
+package com.example.albam.domain.leave.controller;
+
+import com.example.albam.domain.leave.dto.LeaveStatusResponse;
+import com.example.albam.domain.leave.dto.LeaveUsageResponse;
+import com.example.albam.domain.leave.dto.UseLeaveRequest;
+import com.example.albam.domain.leave.service.LeaveService;
+import com.example.albam.global.common.ApiResponse;
+import com.example.albam.global.security.CurrentUserId;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequiredArgsConstructor
+public class LeaveController {
+
+    private final LeaveService leaveService;
+
+    @GetMapping("/api/stores/{storeId}/members/{memberId}/leaves")
+    public ApiResponse<LeaveStatusResponse> getLeaveStatus(@PathVariable Long storeId,
+            @PathVariable Long memberId, @CurrentUserId Long userId) {
+        return ApiResponse.success(leaveService.getLeaveStatus(storeId, memberId, userId));
+    }
+
+    @PostMapping("/api/stores/{storeId}/members/{memberId}/leaves")
+    public ResponseEntity<ApiResponse<LeaveUsageResponse>> useLeave(@PathVariable Long storeId,
+            @PathVariable Long memberId, @CurrentUserId Long userId,
+            @Valid @RequestBody UseLeaveRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(leaveService.useLeave(storeId, memberId, userId, request)));
+    }
+
+    @DeleteMapping("/api/stores/{storeId}/leaves/{leaveId}")
+    public ApiResponse<Void> cancelLeave(@PathVariable Long storeId, @PathVariable Long leaveId,
+            @CurrentUserId Long userId) {
+        leaveService.cancelLeave(storeId, leaveId, userId);
+        return ApiResponse.ok();
+    }
+}

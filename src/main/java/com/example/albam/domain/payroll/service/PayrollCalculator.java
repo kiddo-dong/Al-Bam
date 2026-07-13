@@ -7,8 +7,9 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.time.temporal.IsoFields;
-import java.util.HashMap;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -17,11 +18,15 @@ import java.util.stream.Collectors;
 /**
  * 근로기준법을 반영한 급여 계산기.
  *
+ * <p>입력 근태는 대상 월과 겹치는 ISO 주(월~일) 전체를 포함해야 한다. 주 단위 판정(주 40시간 초과 연장,
+ * 주휴수당)은 주 전체 데이터로 하되, 지급액은 대상 월에 속한 날짜의 근무분만 귀속한다. 주휴수당은 그 주의
+ * 일요일이 속한 월에 지급한다.
+ *
  * <p>포함:
  * <ul>
  *   <li>기본급: 휴게시간을 제외한 실근무시간 x 시급</li>
- *   <li>연장근로수당: 주 단위로 "1일 8시간 초과 합계"와 "주 40시간 초과분" 중 큰 값을 연장으로 보아 1.5배.
- *       주휴일 근로시간은 휴일가산과의 중복을 피하기 위해 연장 판정에서 제외</li>
+ *   <li>연장근로수당: 1일 8시간 초과분 + 주 누적(일 단위 연장 제외) 40시간 초과분을 발생한 날짜에 귀속해
+ *       1.5배 (같은 시간을 중복 가산하지 않음). 주휴일 근로시간은 휴일가산과의 중복을 피하기 위해 제외</li>
  *   <li>야간근로수당: 22:00~06:00 근무시간 0.5배 가산</li>
  *   <li>휴일근로수당: 주휴일 근무 시 8시간까지 0.5배, 초과분 1.0배 가산 (기본급은 별도 지급)</li>
  *   <li>주휴수당: 주 15시간 이상 근무 + 개근(해당 주의 비취소 스케줄 날짜에 모두 출근 기록 존재) 시
@@ -29,9 +34,8 @@ import java.util.stream.Collectors;
  *   <li>5인 미만 사업장: 연장·야간·휴일 가산 미적용 (근무시간은 전부 기본급 1배로 지급, 주휴수당은 적용)</li>
  * </ul>
  *
- * <p>제외(추후 확장 대상): 연차수당, 월 경계에 걸친 주의 전체 주간 근무시간 반영(해당 월의 근태 기록만으로
- * 주간 합계를 계산하므로 월 경계 주는 과소 산정될 수 있음). 야간수당은 휴게가 야간 시간대에 있었는지 알 수
- * 없어 휴게 차감 없이 출퇴근 시각 겹침으로만 계산한다.
+ * <p>제외(추후 확장 대상): 야간수당은 휴게가 야간 시간대에 있었는지 알 수 없어 휴게 차감 없이 출퇴근 시각
+ * 겹침으로만 계산한다. 연차수당은 PayrollService에서 별도 합산한다.
  */
 final class PayrollCalculator {
 
@@ -48,55 +52,77 @@ final class PayrollCalculator {
     }
 
     static PayrollResult calculate(List<Attendance> attendances, int hourlyWage, boolean smallBusiness,
-            DayOfWeek weeklyHolidayDay, Set<LocalDate> scheduledDates) {
-        double nightHours = 0;
-        // 주별 집계: [0]=총 근무시간, [1]=일 8시간 초과 연장 합계(휴일 제외), [2]=휴일근로 8h 이내, [3]=휴일근로 8h 초과
-        Map<String, double[]> weekly = new HashMap<>();
+            DayOfWeek weeklyHolidayDay, Set<LocalDate> scheduledDates, YearMonth targetMonth) {
         Set<LocalDate> attendedDates = attendances.stream()
                 .map(Attendance::getWorkDate)
                 .collect(Collectors.toSet());
-
-        for (Attendance attendance : attendances) {
-            LocalDateTime start = attendance.getClockInAt();
-            LocalDateTime end = attendance.getClockOutAt();
-            long workedMinutes = Duration.between(start, end).toMinutes() - attendance.getBreakMinutes();
-            double workedHours = Math.max(workedMinutes, 0) / 60.0;
-
-            nightHours += nightOverlapMinutes(start, end) / 60.0;
-
-            double[] week = weekly.computeIfAbsent(weekKey(attendance.getWorkDate()), key -> new double[4]);
-            week[0] += workedHours;
-            boolean holidayWork = weeklyHolidayDay != null
-                    && attendance.getWorkDate().getDayOfWeek() == weeklyHolidayDay;
-            if (holidayWork) {
-                week[2] += Math.min(workedHours, LaborStandards.STANDARD_DAILY_HOURS);
-                week[3] += Math.max(workedHours - LaborStandards.STANDARD_DAILY_HOURS, 0);
-            } else {
-                week[1] += Math.max(workedHours - LaborStandards.STANDARD_DAILY_HOURS, 0);
-            }
-        }
-
         Map<String, List<LocalDate>> scheduledByWeek = scheduledDates.stream()
                 .collect(Collectors.groupingBy(PayrollCalculator::weekKey));
+        Map<String, List<Attendance>> attendancesByWeek = attendances.stream()
+                .collect(Collectors.groupingBy(attendance -> weekKey(attendance.getWorkDate())));
 
         double regularHours = 0;
         double overtimeHours = 0;
+        double nightHours = 0;
         double holidayPremiumHours = 0;
         long weeklyHolidayPay = 0;
-        for (Map.Entry<String, double[]> entry : weekly.entrySet()) {
-            double[] week = entry.getValue();
-            double nonHolidayHours = week[0] - week[2] - week[3];
-            double weekOvertime = Math.max(week[1], nonHolidayHours - LaborStandards.STANDARD_WEEKLY_HOURS);
-            overtimeHours += weekOvertime;
-            regularHours += week[0] - weekOvertime;
-            holidayPremiumHours += week[2] * HOLIDAY_PREMIUM_MULTIPLIER
-                    + week[3] * HOLIDAY_OVERTIME_PREMIUM_MULTIPLIER;
 
+        for (Map.Entry<String, List<Attendance>> entry : attendancesByWeek.entrySet()) {
+            List<Attendance> weekAttendances = entry.getValue().stream()
+                    .sorted(Comparator.comparing(Attendance::getClockInAt))
+                    .toList();
+            double weekTotalHours = 0;
+            double cumulativeNonOvertimeHours = 0;
+
+            for (Attendance attendance : weekAttendances) {
+                LocalDateTime start = attendance.getClockInAt();
+                LocalDateTime end = attendance.getClockOutAt();
+                long workedMinutes = Duration.between(start, end).toMinutes() - attendance.getBreakMinutes();
+                double workedHours = Math.max(workedMinutes, 0) / 60.0;
+                boolean inMonth = YearMonth.from(attendance.getWorkDate()).equals(targetMonth);
+                boolean holidayWork = weeklyHolidayDay != null
+                        && attendance.getWorkDate().getDayOfWeek() == weeklyHolidayDay;
+
+                weekTotalHours += workedHours;
+                if (inMonth) {
+                    nightHours += nightOverlapMinutes(start, end) / 60.0;
+                }
+
+                if (holidayWork) {
+                    // 휴일근로는 연장 판정에서 제외하고, 기본급 1배 + 가산(8h까지 0.5배, 초과 1.0배)로 지급
+                    if (inMonth) {
+                        regularHours += workedHours;
+                        holidayPremiumHours +=
+                                Math.min(workedHours, LaborStandards.STANDARD_DAILY_HOURS)
+                                        * HOLIDAY_PREMIUM_MULTIPLIER
+                                        + Math.max(workedHours - LaborStandards.STANDARD_DAILY_HOURS, 0)
+                                        * HOLIDAY_OVERTIME_PREMIUM_MULTIPLIER;
+                    }
+                    continue;
+                }
+
+                double dailyOvertime = Math.max(workedHours - LaborStandards.STANDARD_DAILY_HOURS, 0);
+                double nonOvertime = workedHours - dailyOvertime;
+                // 일 단위 연장을 제외한 누적이 주 40시간을 넘어서는 부분이 이 날짜의 주 단위 연장
+                double weeklyOvertime = Math.min(nonOvertime, Math.max(0,
+                        cumulativeNonOvertimeHours + nonOvertime - LaborStandards.STANDARD_WEEKLY_HOURS));
+                cumulativeNonOvertimeHours += nonOvertime;
+
+                if (inMonth) {
+                    double dayOvertime = dailyOvertime + weeklyOvertime;
+                    overtimeHours += dayOvertime;
+                    regularHours += workedHours - dayOvertime;
+                }
+            }
+
+            // 주휴수당은 그 주의 일요일이 속한 월에 귀속시켜 월 간 중복·누락을 막는다
+            LocalDate weekSunday = weekAttendances.get(0).getWorkDate().with(DayOfWeek.SUNDAY);
             boolean perfectAttendance = scheduledByWeek.getOrDefault(entry.getKey(), List.of()).stream()
                     .allMatch(attendedDates::contains);
-            if (week[0] >= WEEKLY_HOLIDAY_ELIGIBLE_HOURS && perfectAttendance) {
+            if (YearMonth.from(weekSunday).equals(targetMonth)
+                    && weekTotalHours >= WEEKLY_HOLIDAY_ELIGIBLE_HOURS && perfectAttendance) {
                 weeklyHolidayPay += Math.round(
-                        Math.min(week[0], LaborStandards.STANDARD_WEEKLY_HOURS)
+                        Math.min(weekTotalHours, LaborStandards.STANDARD_WEEKLY_HOURS)
                                 / LaborStandards.STANDARD_WEEKLY_HOURS * WEEKLY_HOLIDAY_HOURS * hourlyWage);
             }
         }
@@ -136,8 +162,5 @@ final class PayrollCalculator {
 
     record PayrollResult(long regularPay, long overtimePay, long nightPay, long holidayWorkPay,
             long weeklyHolidayPay) {
-        long totalPay() {
-            return regularPay + overtimePay + nightPay + holidayWorkPay + weeklyHolidayPay;
-        }
     }
 }
