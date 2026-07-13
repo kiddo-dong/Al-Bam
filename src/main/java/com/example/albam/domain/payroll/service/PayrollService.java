@@ -12,6 +12,7 @@ import com.example.albam.domain.shift.entity.Shift;
 import com.example.albam.domain.shift.entity.ShiftStatus;
 import com.example.albam.domain.shift.repository.ShiftRepository;
 import com.example.albam.domain.storemember.entity.StoreMember;
+import com.example.albam.domain.storemember.entity.TaxMode;
 import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.InvalidRequestException;
@@ -73,12 +74,15 @@ public class PayrollService {
         PayrollResult result = PayrollCalculator.calculate(attendances, target.getHourlyWage(),
                 target.getStore().isSmallBusiness(), target.getWeeklyHolidayDay(), scheduledDates, yearMonth);
         long leavePay = calculateLeavePay(target, shifts, monthStart, monthEnd);
+        long grossPay = result.regularPay() + result.overtimePay() + result.nightPay()
+                + result.holidayWorkPay() + result.weeklyHolidayPay() + leavePay;
+        long deduction = calculateDeduction(target.getTaxMode(), grossPay);
 
         Payroll payroll = payrollRepository
                 .findByStoreMemberIdAndTargetYearAndTargetMonth(target.getId(), year, month)
                 .orElseGet(() -> new Payroll(target, year, month));
         payroll.applyResult(result.regularPay(), result.overtimePay(), result.nightPay(),
-                result.holidayWorkPay(), result.weeklyHolidayPay(), leavePay);
+                result.holidayWorkPay(), result.weeklyHolidayPay(), leavePay, deduction);
         payrollRepository.save(payroll);
 
         return PayrollResponse.from(payroll);
@@ -104,5 +108,13 @@ public class PayrollService {
                 ? LaborStandards.STANDARD_DAILY_HOURS
                 : monthShifts.stream().mapToLong(Shift::workMinutes).sum() / 60.0 / scheduledDayCount;
         return Math.round(leaveDays * dailyHours * member.getHourlyWage());
+    }
+
+    private long calculateDeduction(TaxMode taxMode, long grossPay) {
+        return switch (taxMode) {
+            case NONE -> 0;
+            case WITHHOLDING_3_3 -> Math.round(grossPay * LaborStandards.WITHHOLDING_TAX_RATE);
+            case FOUR_INSURANCES -> Math.round(grossPay * LaborStandards.FOUR_INSURANCES_EMPLOYEE_RATE);
+        };
     }
 }

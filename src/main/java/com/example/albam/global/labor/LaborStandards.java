@@ -25,6 +25,15 @@ public final class LaborStandards {
     /** 연소근로자(18세 미만)의 1주 최대 근로시간 (분). */
     public static final int MINOR_MAX_WEEKLY_WORK_MINUTES = 35 * 60;
 
+    /** 사업소득 원천징수율 (소득세 3% + 지방소득세 0.3%). */
+    public static final double WITHHOLDING_TAX_RATE = 0.033;
+
+    /**
+     * 4대보험 근로자 부담 요율 합계의 근사치
+     * (국민연금 4.5% + 건강보험 3.545% + 장기요양 0.459% + 고용보험 0.9%). 매년 고시에 따라 갱신 필요.
+     */
+    public static final double FOUR_INSURANCES_EMPLOYEE_RATE = 0.09404;
+
     private LaborStandards() {
     }
 

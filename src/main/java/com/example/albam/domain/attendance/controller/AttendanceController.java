@@ -1,7 +1,9 @@
 package com.example.albam.domain.attendance.controller;
 
+import com.example.albam.domain.attendance.dto.AttendanceReportEntry;
 import com.example.albam.domain.attendance.dto.AttendanceResponse;
 import com.example.albam.domain.attendance.dto.CorrectAttendanceRequest;
+import com.example.albam.domain.attendance.service.AttendanceReportService;
 import com.example.albam.domain.attendance.service.AttendanceService;
 import com.example.albam.global.common.ApiResponse;
 import com.example.albam.global.security.CurrentUserId;
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AttendanceController {
 
     private final AttendanceService attendanceService;
+    private final AttendanceReportService attendanceReportService;
 
     @PostMapping("/clock-in")
     public ApiResponse<AttendanceResponse> clockIn(@PathVariable Long storeId, @CurrentUserId Long userId) {
@@ -51,6 +54,15 @@ public class AttendanceController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return ApiResponse.success(attendanceService.getStoreAttendance(storeId, userId, from, to));
+    }
+
+    @GetMapping("/report")
+    public ApiResponse<List<AttendanceReportEntry>> getReport(@PathVariable Long storeId,
+            @CurrentUserId Long userId,
+            @RequestParam(required = false) Long storeMemberId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ApiResponse.success(attendanceReportService.getReport(storeId, userId, storeMemberId, from, to));
     }
 
     @PatchMapping("/{attendanceId}")

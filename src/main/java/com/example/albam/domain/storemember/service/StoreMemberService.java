@@ -58,6 +58,9 @@ public class StoreMemberService {
         if (request.weeklyHolidayDay() != null) {
             target.changeWeeklyHolidayDay(request.weeklyHolidayDay());
         }
+        if (request.taxMode() != null) {
+            target.changeTaxMode(request.taxMode());
+        }
         return StoreMemberResponse.from(target);
     }
 

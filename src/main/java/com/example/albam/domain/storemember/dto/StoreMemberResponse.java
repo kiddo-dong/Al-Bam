@@ -3,6 +3,7 @@ package com.example.albam.domain.storemember.dto;
 import com.example.albam.domain.storemember.entity.MemberRole;
 import com.example.albam.domain.storemember.entity.MemberStatus;
 import com.example.albam.domain.storemember.entity.StoreMember;
+import com.example.albam.domain.storemember.entity.TaxMode;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.Set;
@@ -17,7 +18,8 @@ public record StoreMemberResponse(
         MemberStatus status,
         LocalDateTime joinedAt,
         Set<DayOfWeek> availableDays,
-        DayOfWeek weeklyHolidayDay
+        DayOfWeek weeklyHolidayDay,
+        TaxMode taxMode
 ) {
     public static StoreMemberResponse from(StoreMember member) {
         return new StoreMemberResponse(
@@ -30,7 +32,8 @@ public record StoreMemberResponse(
                 member.getStatus(),
                 member.getJoinedAt(),
                 member.getAvailableDays(),
-                member.getWeeklyHolidayDay()
+                member.getWeeklyHolidayDay(),
+                member.getTaxMode()
         );
     }
 }

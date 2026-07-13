@@ -17,4 +17,8 @@ public interface LeaveUsageRepository extends JpaRepository<LeaveUsage, Long> {
     boolean existsByStoreMemberIdAndLeaveDate(Long storeMemberId, LocalDate leaveDate);
 
     Optional<LeaveUsage> findByIdAndStoreMemberStoreId(Long id, Long storeId);
+
+    List<LeaveUsage> findAllByStoreMemberIdAndLeaveDateBetween(Long storeMemberId, LocalDate from, LocalDate to);
+
+    List<LeaveUsage> findAllByStoreMemberStoreIdAndLeaveDateBetween(Long storeId, LocalDate from, LocalDate to);
 }

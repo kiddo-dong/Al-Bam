@@ -1,6 +1,7 @@
 package com.example.albam.domain.payroll.dto;
 
 import com.example.albam.domain.payroll.entity.Payroll;
+import com.example.albam.domain.storemember.entity.TaxMode;
 
 public record PayrollResponse(
         Long storeMemberId,
@@ -13,7 +14,10 @@ public record PayrollResponse(
         long holidayWorkPay,
         long weeklyHolidayPay,
         long leavePay,
-        long totalPay
+        long totalPay,
+        TaxMode taxMode,
+        long deduction,
+        long netPay
 ) {
     public static PayrollResponse from(Payroll payroll) {
         return new PayrollResponse(
@@ -27,7 +31,10 @@ public record PayrollResponse(
                 payroll.getHolidayWorkPay(),
                 payroll.getWeeklyHolidayPay(),
                 payroll.getLeavePay(),
-                payroll.getTotalPay()
+                payroll.getTotalPay(),
+                payroll.getStoreMember().getTaxMode(),
+                payroll.getDeduction(),
+                payroll.getNetPay()
         );
     }
 }

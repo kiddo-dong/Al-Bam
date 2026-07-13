@@ -67,6 +67,11 @@ public class StoreMember extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     private DayOfWeek weeklyHolidayDay;
 
+    /** 급여 공제 방식 (기본: 공제 없음). */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TaxMode taxMode;
+
     public StoreMember(Store store, User user, MemberRole role, int hourlyWage) {
         this.store = store;
         this.user = user;
@@ -74,6 +79,7 @@ public class StoreMember extends BaseTimeEntity {
         this.hourlyWage = hourlyWage;
         this.status = MemberStatus.ACTIVE;
         this.joinedAt = LocalDateTime.now();
+        this.taxMode = TaxMode.NONE;
     }
 
     public void changeRole(MemberRole role) {
@@ -97,6 +103,10 @@ public class StoreMember extends BaseTimeEntity {
 
     public void changeWeeklyHolidayDay(DayOfWeek weeklyHolidayDay) {
         this.weeklyHolidayDay = weeklyHolidayDay;
+    }
+
+    public void changeTaxMode(TaxMode taxMode) {
+        this.taxMode = taxMode;
     }
 
     public boolean isOwnerOrManager() {

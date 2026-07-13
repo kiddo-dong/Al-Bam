@@ -58,8 +58,17 @@ public class Payroll extends BaseTimeEntity {
     @Column(nullable = false)
     private long leavePay;
 
+    /** 세전 총액. */
     @Column(nullable = false)
     private long totalPay;
+
+    /** 공제액 (taxMode에 따른 원천징수·4대보험 근로자 부담분). */
+    @Column(nullable = false)
+    private long deduction;
+
+    /** 실지급액 (totalPay - deduction). */
+    @Column(nullable = false)
+    private long netPay;
 
     @Column(nullable = false)
     private LocalDateTime generatedAt;
@@ -72,7 +81,7 @@ public class Payroll extends BaseTimeEntity {
     }
 
     public void applyResult(long regularPay, long overtimePay, long nightPay, long holidayWorkPay,
-            long weeklyHolidayPay, long leavePay) {
+            long weeklyHolidayPay, long leavePay, long deduction) {
         this.regularPay = regularPay;
         this.overtimePay = overtimePay;
         this.nightPay = nightPay;
@@ -80,6 +89,8 @@ public class Payroll extends BaseTimeEntity {
         this.weeklyHolidayPay = weeklyHolidayPay;
         this.leavePay = leavePay;
         this.totalPay = regularPay + overtimePay + nightPay + holidayWorkPay + weeklyHolidayPay + leavePay;
+        this.deduction = deduction;
+        this.netPay = this.totalPay - deduction;
         this.generatedAt = LocalDateTime.now();
     }
 }
