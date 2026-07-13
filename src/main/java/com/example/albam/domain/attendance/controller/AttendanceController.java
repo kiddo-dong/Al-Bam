@@ -1,0 +1,50 @@
+package com.example.albam.domain.attendance.controller;
+
+import com.example.albam.domain.attendance.dto.AttendanceResponse;
+import com.example.albam.domain.attendance.service.AttendanceService;
+import com.example.albam.global.common.ApiResponse;
+import com.example.albam.global.security.CurrentUserId;
+import java.time.LocalDate;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/stores/{storeId}/attendance")
+@RequiredArgsConstructor
+public class AttendanceController {
+
+    private final AttendanceService attendanceService;
+
+    @PostMapping("/clock-in")
+    public ApiResponse<AttendanceResponse> clockIn(@PathVariable Long storeId, @CurrentUserId Long userId) {
+        return ApiResponse.success(attendanceService.clockIn(storeId, userId));
+    }
+
+    @PostMapping("/clock-out")
+    public ApiResponse<AttendanceResponse> clockOut(@PathVariable Long storeId, @CurrentUserId Long userId) {
+        return ApiResponse.success(attendanceService.clockOut(storeId, userId));
+    }
+
+    @GetMapping("/me")
+    public ApiResponse<List<AttendanceResponse>> getMyAttendance(@PathVariable Long storeId,
+            @CurrentUserId Long userId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ApiResponse.success(attendanceService.getMyAttendance(storeId, userId, from, to));
+    }
+
+    @GetMapping
+    public ApiResponse<List<AttendanceResponse>> getStoreAttendance(@PathVariable Long storeId,
+            @CurrentUserId Long userId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ApiResponse.success(attendanceService.getStoreAttendance(storeId, userId, from, to));
+    }
+}
