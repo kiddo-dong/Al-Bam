@@ -63,4 +63,14 @@ public class Attendance extends BaseTimeEntity {
         this.clockOutAt = clockOutAt;
         this.status = AttendanceStatus.DONE;
     }
+
+    public void correctTimes(LocalDateTime clockInAt, LocalDateTime clockOutAt) {
+        if (clockOutAt != null && !clockOutAt.isAfter(clockInAt)) {
+            throw new InvalidRequestException("퇴근 시각은 출근 시각 이후여야 합니다.");
+        }
+        this.workDate = clockInAt.toLocalDate();
+        this.clockInAt = clockInAt;
+        this.clockOutAt = clockOutAt;
+        this.status = clockOutAt == null ? AttendanceStatus.WORKING : AttendanceStatus.DONE;
+    }
 }

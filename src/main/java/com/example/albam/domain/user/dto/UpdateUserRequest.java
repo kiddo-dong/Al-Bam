@@ -1,0 +1,12 @@
+package com.example.albam.domain.user.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+
+public record UpdateUserRequest(
+        @NotBlank String name,
+        @NotBlank
+        @Pattern(regexp = "^01[0-9]-\\d{3,4}-\\d{4}$", message = "휴대폰 번호 형식이 올바르지 않습니다. 예: 010-1234-5678")
+        String phone
+) {
+}

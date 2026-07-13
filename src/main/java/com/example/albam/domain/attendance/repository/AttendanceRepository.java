@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
+    Optional<Attendance> findByIdAndStoreMemberStoreId(Long id, Long storeId);
+
     Optional<Attendance> findFirstByStoreMemberIdAndStatus(Long storeMemberId, AttendanceStatus status);
 
     List<Attendance> findAllByStoreMemberIdAndWorkDateBetweenOrderByWorkDateDesc(

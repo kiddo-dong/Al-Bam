@@ -14,4 +14,6 @@ public interface StoreMemberRepository extends JpaRepository<StoreMember, Long> 
     List<StoreMember> findAllByUserId(Long userId);
 
     boolean existsByStoreIdAndUserId(Long storeId, Long userId);
+
+    boolean existsByUserId(Long userId);
 }

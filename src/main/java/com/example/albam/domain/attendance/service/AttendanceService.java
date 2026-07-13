@@ -1,12 +1,14 @@
 package com.example.albam.domain.attendance.service;
 
 import com.example.albam.domain.attendance.dto.AttendanceResponse;
+import com.example.albam.domain.attendance.dto.CorrectAttendanceRequest;
 import com.example.albam.domain.attendance.entity.Attendance;
 import com.example.albam.domain.attendance.entity.AttendanceStatus;
 import com.example.albam.domain.attendance.repository.AttendanceRepository;
 import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.InvalidRequestException;
+import com.example.albam.global.exception.NotFoundException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -57,5 +59,25 @@ public class AttendanceService {
                 .findAllByStoreMemberStoreIdAndWorkDateBetweenOrderByWorkDateDesc(storeId, from, to).stream()
                 .map(AttendanceResponse::from)
                 .toList();
+    }
+
+    @Transactional
+    public AttendanceResponse correctAttendance(Long storeId, Long attendanceId, Long userId,
+            CorrectAttendanceRequest request) {
+        storeAuthorizationService.requireOwnerOrManager(storeId, userId);
+        Attendance attendance = getAttendanceInStore(storeId, attendanceId);
+        attendance.correctTimes(request.clockInAt(), request.clockOutAt());
+        return AttendanceResponse.from(attendance);
+    }
+
+    @Transactional
+    public void deleteAttendance(Long storeId, Long attendanceId, Long userId) {
+        storeAuthorizationService.requireOwnerOrManager(storeId, userId);
+        attendanceRepository.delete(getAttendanceInStore(storeId, attendanceId));
+    }
+
+    private Attendance getAttendanceInStore(Long storeId, Long attendanceId) {
+        return attendanceRepository.findByIdAndStoreMemberStoreId(attendanceId, storeId)
+                .orElseThrow(() -> new NotFoundException("근태 기록을 찾을 수 없습니다."));
     }
 }
