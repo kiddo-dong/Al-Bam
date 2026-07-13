@@ -46,6 +46,10 @@ public class Attendance extends BaseTimeEntity {
     @Column(nullable = false)
     private AttendanceStatus status;
 
+    /** 무급 휴게시간(분). 급여 계산 시 근무시간에서 제외된다. */
+    @Column(nullable = false)
+    private int breakMinutes;
+
     public Attendance(StoreMember storeMember, LocalDateTime clockInAt) {
         this.storeMember = storeMember;
         this.workDate = clockInAt.toLocalDate();
@@ -53,7 +57,7 @@ public class Attendance extends BaseTimeEntity {
         this.status = AttendanceStatus.WORKING;
     }
 
-    public void clockOut(LocalDateTime clockOutAt) {
+    public void clockOut(LocalDateTime clockOutAt, int breakMinutes) {
         if (status == AttendanceStatus.DONE) {
             throw new InvalidRequestException("이미 퇴근 처리된 근무입니다.");
         }
@@ -61,16 +65,18 @@ public class Attendance extends BaseTimeEntity {
             throw new InvalidRequestException("퇴근 시각은 출근 시각 이후여야 합니다.");
         }
         this.clockOutAt = clockOutAt;
+        this.breakMinutes = breakMinutes;
         this.status = AttendanceStatus.DONE;
     }
 
-    public void correctTimes(LocalDateTime clockInAt, LocalDateTime clockOutAt) {
+    public void correctTimes(LocalDateTime clockInAt, LocalDateTime clockOutAt, int breakMinutes) {
         if (clockOutAt != null && !clockOutAt.isAfter(clockInAt)) {
             throw new InvalidRequestException("퇴근 시각은 출근 시각 이후여야 합니다.");
         }
         this.workDate = clockInAt.toLocalDate();
         this.clockInAt = clockInAt;
         this.clockOutAt = clockOutAt;
+        this.breakMinutes = clockOutAt == null ? 0 : breakMinutes;
         this.status = clockOutAt == null ? AttendanceStatus.WORKING : AttendanceStatus.DONE;
     }
 }

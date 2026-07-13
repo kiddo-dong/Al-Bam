@@ -13,6 +13,7 @@ public record ShiftResponse(
         LocalTime startTime,
         LocalTime endTime,
         boolean overnight,
+        int breakMinutes,
         ShiftStatus status
 ) {
     public static ShiftResponse from(Shift shift) {
@@ -24,6 +25,7 @@ public record ShiftResponse(
                 shift.getStartTime(),
                 shift.getEndTime(),
                 shift.isOvernight(),
+                shift.getBreakMinutes(),
                 shift.getStatus()
         );
     }

@@ -5,10 +5,13 @@ import com.example.albam.domain.attendance.dto.CorrectAttendanceRequest;
 import com.example.albam.domain.attendance.entity.Attendance;
 import com.example.albam.domain.attendance.entity.AttendanceStatus;
 import com.example.albam.domain.attendance.repository.AttendanceRepository;
+import com.example.albam.domain.store.entity.BreakPolicy;
 import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.exception.NotFoundException;
+import com.example.albam.global.labor.LaborStandards;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -41,7 +44,8 @@ public class AttendanceService {
         Attendance attendance = attendanceRepository
                 .findFirstByStoreMemberIdAndStatus(member.getId(), AttendanceStatus.WORKING)
                 .orElseThrow(() -> new InvalidRequestException("출근 중인 근무가 없습니다."));
-        attendance.clockOut(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        attendance.clockOut(now, resolveBreakMinutes(member, attendance.getClockInAt(), now, null));
         return AttendanceResponse.from(attendance);
     }
 
@@ -66,7 +70,10 @@ public class AttendanceService {
             CorrectAttendanceRequest request) {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         Attendance attendance = getAttendanceInStore(storeId, attendanceId);
-        attendance.correctTimes(request.clockInAt(), request.clockOutAt());
+        int breakMinutes = request.clockOutAt() == null ? 0
+                : resolveBreakMinutes(attendance.getStoreMember(), request.clockInAt(), request.clockOutAt(),
+                        request.breakMinutes());
+        attendance.correctTimes(request.clockInAt(), request.clockOutAt(), breakMinutes);
         return AttendanceResponse.from(attendance);
     }
 
@@ -79,5 +86,12 @@ public class AttendanceService {
     private Attendance getAttendanceInStore(Long storeId, Long attendanceId) {
         return attendanceRepository.findByIdAndStoreMemberStoreId(attendanceId, storeId)
                 .orElseThrow(() -> new NotFoundException("근태 기록을 찾을 수 없습니다."));
+    }
+
+    private int resolveBreakMinutes(StoreMember member, LocalDateTime clockInAt, LocalDateTime clockOutAt,
+            Integer requested) {
+        boolean statutory = member.getStore().getBreakPolicy() == BreakPolicy.STATUTORY;
+        long spanMinutes = Duration.between(clockInAt, clockOutAt).toMinutes();
+        return LaborStandards.resolveBreakMinutes(statutory, spanMinutes, requested);
     }
 }

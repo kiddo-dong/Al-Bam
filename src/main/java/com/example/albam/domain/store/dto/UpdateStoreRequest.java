@@ -1,5 +1,6 @@
 package com.example.albam.domain.store.dto;
 
+import com.example.albam.domain.store.entity.BreakPolicy;
 import com.example.albam.domain.store.entity.StoreCategory;
 import jakarta.validation.constraints.NotBlank;
 import java.time.DayOfWeek;
@@ -10,6 +11,7 @@ public record UpdateStoreRequest(
         String address,
         String businessRegistrationNumber,
         StoreCategory category,
-        Map<DayOfWeek, BusinessHourRequest> businessHours
+        Map<DayOfWeek, BusinessHourRequest> businessHours,
+        BreakPolicy breakPolicy
 ) {
 }

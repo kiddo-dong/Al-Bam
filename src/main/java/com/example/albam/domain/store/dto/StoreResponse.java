@@ -1,5 +1,6 @@
 package com.example.albam.domain.store.dto;
 
+import com.example.albam.domain.store.entity.BreakPolicy;
 import com.example.albam.domain.store.entity.Store;
 import com.example.albam.domain.store.entity.StoreCategory;
 import java.time.DayOfWeek;
@@ -12,12 +13,14 @@ public record StoreResponse(
         String address,
         String businessRegistrationNumber,
         StoreCategory category,
-        Map<DayOfWeek, BusinessHourResponse> businessHours
+        Map<DayOfWeek, BusinessHourResponse> businessHours,
+        BreakPolicy breakPolicy
 ) {
     public static StoreResponse from(Store store) {
         Map<DayOfWeek, BusinessHourResponse> businessHours = store.getBusinessHours().entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> BusinessHourResponse.from(entry.getValue())));
         return new StoreResponse(store.getId(), store.getName(), store.getAddress(),
-                store.getBusinessRegistrationNumber(), store.getCategory(), businessHours);
+                store.getBusinessRegistrationNumber(), store.getCategory(), businessHours,
+                store.getBreakPolicy());
     }
 }

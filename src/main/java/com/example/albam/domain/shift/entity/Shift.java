@@ -14,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -48,20 +49,28 @@ public class Shift extends BaseTimeEntity {
     @Column(nullable = false)
     private ShiftStatus status;
 
-    public Shift(StoreMember storeMember, LocalDate workDate, LocalTime startTime, LocalTime endTime) {
+    /** 무급 휴게시간(분). 근무시간 계산에서 제외된다. */
+    @Column(nullable = false)
+    private int breakMinutes;
+
+    public Shift(StoreMember storeMember, LocalDate workDate, LocalTime startTime, LocalTime endTime,
+            int breakMinutes) {
         validateTimeRange(startTime, endTime);
         this.storeMember = storeMember;
         this.workDate = workDate;
         this.startTime = startTime;
         this.endTime = endTime;
+        this.breakMinutes = breakMinutes;
         this.status = ShiftStatus.SCHEDULED;
     }
 
-    public void update(LocalDate workDate, LocalTime startTime, LocalTime endTime, ShiftStatus status) {
+    public void update(LocalDate workDate, LocalTime startTime, LocalTime endTime, int breakMinutes,
+            ShiftStatus status) {
         validateTimeRange(startTime, endTime);
         this.workDate = workDate;
         this.startTime = startTime;
         this.endTime = endTime;
+        this.breakMinutes = breakMinutes;
         this.status = status;
     }
 
@@ -78,6 +87,11 @@ public class Shift extends BaseTimeEntity {
     public LocalDateTime endDateTime() {
         LocalDate endDate = isOvernight() ? workDate.plusDays(1) : workDate;
         return endDate.atTime(endTime);
+    }
+
+    /** 휴게시간을 제외한 실근무시간(분). */
+    public long workMinutes() {
+        return Duration.between(startDateTime(), endDateTime()).toMinutes() - breakMinutes;
     }
 
     private void validateTimeRange(LocalTime startTime, LocalTime endTime) {

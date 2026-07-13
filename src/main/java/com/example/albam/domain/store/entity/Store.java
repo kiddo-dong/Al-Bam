@@ -51,8 +51,12 @@ public class Store extends BaseTimeEntity {
     @Column(nullable = false, unique = true, length = 6)
     private String inviteCode;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private BreakPolicy breakPolicy;
+
     public Store(String name, String address, String businessRegistrationNumber, StoreCategory category,
-            Map<DayOfWeek, BusinessHour> businessHours, String inviteCode) {
+            Map<DayOfWeek, BusinessHour> businessHours, String inviteCode, BreakPolicy breakPolicy) {
         this.name = name;
         this.address = address;
         this.businessRegistrationNumber = businessRegistrationNumber;
@@ -61,6 +65,7 @@ public class Store extends BaseTimeEntity {
             this.businessHours = businessHours;
         }
         this.inviteCode = inviteCode;
+        this.breakPolicy = breakPolicy == null ? BreakPolicy.STATUTORY : breakPolicy;
     }
 
     public void changeInviteCode(String inviteCode) {
@@ -68,7 +73,7 @@ public class Store extends BaseTimeEntity {
     }
 
     public void update(String name, String address, String businessRegistrationNumber, StoreCategory category,
-            Map<DayOfWeek, BusinessHour> businessHours) {
+            Map<DayOfWeek, BusinessHour> businessHours, BreakPolicy breakPolicy) {
         this.name = name;
         this.address = address;
         this.businessRegistrationNumber = businessRegistrationNumber;
@@ -77,5 +82,6 @@ public class Store extends BaseTimeEntity {
         if (businessHours != null) {
             this.businessHours.putAll(businessHours);
         }
+        this.breakPolicy = breakPolicy == null ? BreakPolicy.STATUTORY : breakPolicy;
     }
 }

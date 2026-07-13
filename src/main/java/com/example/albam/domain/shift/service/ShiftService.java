@@ -9,6 +9,7 @@ import com.example.albam.domain.shift.dto.UpdateShiftRequest;
 import com.example.albam.domain.shift.entity.Shift;
 import com.example.albam.domain.shift.entity.ShiftStatus;
 import com.example.albam.domain.shift.repository.ShiftRepository;
+import com.example.albam.domain.store.entity.BreakPolicy;
 import com.example.albam.domain.store.entity.BusinessHour;
 import com.example.albam.domain.store.entity.Store;
 import com.example.albam.domain.storemember.entity.StoreMember;
@@ -16,7 +17,9 @@ import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.exception.NotFoundException;
+import com.example.albam.global.labor.LaborStandards;
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -43,10 +46,13 @@ public class ShiftService {
     public ShiftResponse createShift(Long storeId, Long userId, CreateShiftRequest request) {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         StoreMember target = getStoreMemberInStore(storeId, request.storeMemberId());
+        int breakMinutes = resolveBreakMinutes(target.getStore(), request.startTime(), request.endTime(),
+                request.breakMinutes());
         validateAvailability(target, request.workDate(), request.startTime(), request.endTime());
         validateNoOverlap(target, request.workDate(), request.startTime(), request.endTime(), null);
+        validateWeeklyLimit(target, request.workDate(), request.startTime(), request.endTime(), breakMinutes, null);
         Shift shift = shiftRepository.save(
-                new Shift(target, request.workDate(), request.startTime(), request.endTime()));
+                new Shift(target, request.workDate(), request.startTime(), request.endTime(), breakMinutes));
         return ShiftResponse.from(shift);
     }
 
@@ -63,6 +69,8 @@ public class ShiftService {
             throw new InvalidRequestException("반복 스케줄 생성 기간은 최대 " + MAX_RECURRING_PERIOD_DAYS + "일까지 가능합니다.");
         }
 
+        int breakMinutes = resolveBreakMinutes(target.getStore(), request.startTime(), request.endTime(),
+                request.breakMinutes());
         List<ShiftResponse> created = new ArrayList<>();
         List<SkippedShiftDate> skipped = new ArrayList<>();
         for (LocalDate date = request.periodStart(); !date.isAfter(request.periodEnd()); date = date.plusDays(1)) {
@@ -72,7 +80,9 @@ public class ShiftService {
             try {
                 validateAvailability(target, date, request.startTime(), request.endTime());
                 validateNoOverlap(target, date, request.startTime(), request.endTime(), null);
-                Shift shift = shiftRepository.save(new Shift(target, date, request.startTime(), request.endTime()));
+                validateWeeklyLimit(target, date, request.startTime(), request.endTime(), breakMinutes, null);
+                Shift shift = shiftRepository.save(
+                        new Shift(target, date, request.startTime(), request.endTime(), breakMinutes));
                 created.add(ShiftResponse.from(shift));
             } catch (InvalidRequestException e) {
                 skipped.add(new SkippedShiftDate(date, e.getMessage()));
@@ -100,12 +110,16 @@ public class ShiftService {
     public ShiftResponse updateShift(Long storeId, Long shiftId, Long userId, UpdateShiftRequest request) {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         Shift shift = getShiftInStore(storeId, shiftId);
-        validateAvailability(shift.getStoreMember(), request.workDate(), request.startTime(), request.endTime());
+        StoreMember member = shift.getStoreMember();
+        int breakMinutes = resolveBreakMinutes(member.getStore(), request.startTime(), request.endTime(),
+                request.breakMinutes());
+        validateAvailability(member, request.workDate(), request.startTime(), request.endTime());
         if (request.status() != ShiftStatus.CANCELED) {
-            validateNoOverlap(shift.getStoreMember(), request.workDate(), request.startTime(),
-                    request.endTime(), shiftId);
+            validateNoOverlap(member, request.workDate(), request.startTime(), request.endTime(), shiftId);
+            validateWeeklyLimit(member, request.workDate(), request.startTime(), request.endTime(),
+                    breakMinutes, shiftId);
         }
-        shift.update(request.workDate(), request.startTime(), request.endTime(), request.status());
+        shift.update(request.workDate(), request.startTime(), request.endTime(), breakMinutes, request.status());
         return ShiftResponse.from(shift);
     }
 
@@ -147,6 +161,38 @@ public class ShiftService {
             throw new InvalidRequestException(
                     member.getUser().getName() + "님은 해당 요일에 근무 가능으로 설정되어 있지 않습니다.");
         }
+    }
+
+    private int resolveBreakMinutes(Store store, LocalTime startTime, LocalTime endTime, Integer requested) {
+        return LaborStandards.resolveBreakMinutes(store.getBreakPolicy() == BreakPolicy.STATUTORY,
+                spanMinutes(startTime, endTime), requested);
+    }
+
+    /** 해당 주(월~일, workDate 기준)의 스케줄 합산 근무시간이 주 52시간을 넘으면 거부한다. */
+    private void validateWeeklyLimit(StoreMember member, LocalDate workDate, LocalTime startTime,
+            LocalTime endTime, int breakMinutes, Long excludeShiftId) {
+        LocalDate weekStart = workDate.with(DayOfWeek.MONDAY);
+        LocalDate weekEnd = weekStart.plusDays(6);
+        long weeklyMinutes = spanMinutes(startTime, endTime) - breakMinutes;
+        for (Shift existing : shiftRepository
+                .findAllByStoreMemberIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(
+                        member.getId(), weekStart, weekEnd)) {
+            if (existing.getId().equals(excludeShiftId) || existing.getStatus() == ShiftStatus.CANCELED) {
+                continue;
+            }
+            weeklyMinutes += existing.workMinutes();
+        }
+        if (weeklyMinutes > LaborStandards.MAX_WEEKLY_WORK_MINUTES) {
+            throw new InvalidRequestException(
+                    "해당 주의 스케줄 합계가 주 52시간을 초과합니다. (현재 배정 시 " + weeklyMinutes / 60 + "시간 "
+                            + weeklyMinutes % 60 + "분)");
+        }
+    }
+
+    /** 체류시간(분). 자정을 넘는 근무는 다음날 종료로 계산한다. */
+    private long spanMinutes(LocalTime startTime, LocalTime endTime) {
+        long minutes = Duration.between(startTime, endTime).toMinutes();
+        return minutes <= 0 ? minutes + 24 * 60 : minutes;
     }
 
     /**

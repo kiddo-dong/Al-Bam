@@ -7,7 +7,9 @@ import com.example.albam.domain.storemember.entity.MemberRole;
 import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.global.exception.ForbiddenException;
+import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.exception.NotFoundException;
+import com.example.albam.global.labor.LaborStandards;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,6 +43,10 @@ public class StoreMemberService {
             target.changeRole(request.role());
         }
         if (request.hourlyWage() != null) {
+            if (request.hourlyWage() < LaborStandards.MINIMUM_HOURLY_WAGE) {
+                throw new InvalidRequestException(
+                        "시급은 최저임금(" + LaborStandards.MINIMUM_HOURLY_WAGE + "원) 이상이어야 합니다.");
+            }
             target.changeHourlyWage(request.hourlyWage());
         }
         if (request.status() != null) {

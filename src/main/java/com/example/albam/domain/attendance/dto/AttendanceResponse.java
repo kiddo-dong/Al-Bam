@@ -12,6 +12,7 @@ public record AttendanceResponse(
         LocalDate workDate,
         LocalDateTime clockInAt,
         LocalDateTime clockOutAt,
+        int breakMinutes,
         AttendanceStatus status
 ) {
     public static AttendanceResponse from(Attendance attendance) {
@@ -22,6 +23,7 @@ public record AttendanceResponse(
                 attendance.getWorkDate(),
                 attendance.getClockInAt(),
                 attendance.getClockOutAt(),
+                attendance.getBreakMinutes(),
                 attendance.getStatus()
         );
     }
