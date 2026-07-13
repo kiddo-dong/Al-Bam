@@ -7,6 +7,7 @@ import com.example.albam.domain.shift.dto.ShiftResponse;
 import com.example.albam.domain.shift.dto.SkippedShiftDate;
 import com.example.albam.domain.shift.dto.UpdateShiftRequest;
 import com.example.albam.domain.shift.entity.Shift;
+import com.example.albam.domain.shift.entity.ShiftStatus;
 import com.example.albam.domain.shift.repository.ShiftRepository;
 import com.example.albam.domain.store.entity.BusinessHour;
 import com.example.albam.domain.store.entity.Store;
@@ -17,6 +18,7 @@ import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.exception.NotFoundException;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -42,6 +44,7 @@ public class ShiftService {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         StoreMember target = getStoreMemberInStore(storeId, request.storeMemberId());
         validateAvailability(target, request.workDate(), request.startTime(), request.endTime());
+        validateNoOverlap(target, request.workDate(), request.startTime(), request.endTime(), null);
         Shift shift = shiftRepository.save(
                 new Shift(target, request.workDate(), request.startTime(), request.endTime()));
         return ShiftResponse.from(shift);
@@ -68,6 +71,7 @@ public class ShiftService {
             }
             try {
                 validateAvailability(target, date, request.startTime(), request.endTime());
+                validateNoOverlap(target, date, request.startTime(), request.endTime(), null);
                 Shift shift = shiftRepository.save(new Shift(target, date, request.startTime(), request.endTime()));
                 created.add(ShiftResponse.from(shift));
             } catch (InvalidRequestException e) {
@@ -97,6 +101,10 @@ public class ShiftService {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         Shift shift = getShiftInStore(storeId, shiftId);
         validateAvailability(shift.getStoreMember(), request.workDate(), request.startTime(), request.endTime());
+        if (request.status() != ShiftStatus.CANCELED) {
+            validateNoOverlap(shift.getStoreMember(), request.workDate(), request.startTime(),
+                    request.endTime(), shiftId);
+        }
         shift.update(request.workDate(), request.startTime(), request.endTime(), request.status());
         return ShiftResponse.from(shift);
     }
@@ -138,6 +146,32 @@ public class ShiftService {
         if (!availableDays.isEmpty() && !availableDays.contains(dayOfWeek)) {
             throw new InvalidRequestException(
                     member.getUser().getName() + "님은 해당 요일에 근무 가능으로 설정되어 있지 않습니다.");
+        }
+    }
+
+    /**
+     * 같은 멤버에게 시간이 겹치는 스케줄이 이미 있으면 거부한다. 자정을 넘는 야간 스케줄까지 비교하기 위해
+     * 전날~다음날 스케줄을 함께 조회하고, 날짜+시간(LocalDateTime)으로 정규화하여 구간 겹침을 판정한다.
+     * 취소된 스케줄과 자기 자신(수정 시)은 비교 대상에서 제외한다.
+     */
+    private void validateNoOverlap(StoreMember member, LocalDate workDate, LocalTime startTime,
+            LocalTime endTime, Long excludeShiftId) {
+        LocalDateTime newStart = workDate.atTime(startTime);
+        LocalDate newEndDate = endTime.isBefore(startTime) ? workDate.plusDays(1) : workDate;
+        LocalDateTime newEnd = newEndDate.atTime(endTime);
+
+        List<Shift> candidates = shiftRepository
+                .findAllByStoreMemberIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(
+                        member.getId(), workDate.minusDays(1), workDate.plusDays(1));
+        for (Shift existing : candidates) {
+            if (existing.getId().equals(excludeShiftId) || existing.getStatus() == ShiftStatus.CANCELED) {
+                continue;
+            }
+            if (newStart.isBefore(existing.endDateTime()) && existing.startDateTime().isBefore(newEnd)) {
+                throw new InvalidRequestException(
+                        "겹치는 스케줄이 이미 있습니다: " + existing.getWorkDate() + " "
+                                + existing.getStartTime() + "~" + existing.getEndTime());
+            }
         }
     }
 

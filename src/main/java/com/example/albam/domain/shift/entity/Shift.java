@@ -15,6 +15,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -67,6 +68,16 @@ public class Shift extends BaseTimeEntity {
     /** 자정을 넘기는 야간 근무(예: 23:00~06:00)는 종료 시각이 시작 시각보다 이르게 표현되므로 허용한다. */
     public boolean isOvernight() {
         return endTime.isBefore(startTime);
+    }
+
+    public LocalDateTime startDateTime() {
+        return workDate.atTime(startTime);
+    }
+
+    /** 야간 근무는 종료 시각이 다음날에 속하므로 하루를 더해 정규화한다. */
+    public LocalDateTime endDateTime() {
+        LocalDate endDate = isOvernight() ? workDate.plusDays(1) : workDate;
+        return endDate.atTime(endTime);
     }
 
     private void validateTimeRange(LocalTime startTime, LocalTime endTime) {
