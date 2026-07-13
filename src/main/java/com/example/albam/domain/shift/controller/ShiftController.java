@@ -1,6 +1,8 @@
 package com.example.albam.domain.shift.controller;
 
+import com.example.albam.domain.shift.dto.CreateRecurringShiftRequest;
 import com.example.albam.domain.shift.dto.CreateShiftRequest;
+import com.example.albam.domain.shift.dto.RecurringShiftResult;
 import com.example.albam.domain.shift.dto.ShiftResponse;
 import com.example.albam.domain.shift.dto.UpdateShiftRequest;
 import com.example.albam.domain.shift.service.ShiftService;
@@ -35,6 +37,13 @@ public class ShiftController {
             @CurrentUserId Long userId, @Valid @RequestBody CreateShiftRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(shiftService.createShift(storeId, userId, request)));
+    }
+
+    @PostMapping("/recurring")
+    public ResponseEntity<ApiResponse<RecurringShiftResult>> createRecurringShifts(@PathVariable Long storeId,
+            @CurrentUserId Long userId, @Valid @RequestBody CreateRecurringShiftRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(shiftService.createRecurringShifts(storeId, userId, request)));
     }
 
     @GetMapping

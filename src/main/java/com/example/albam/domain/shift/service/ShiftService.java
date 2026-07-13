@@ -1,7 +1,10 @@
 package com.example.albam.domain.shift.service;
 
+import com.example.albam.domain.shift.dto.CreateRecurringShiftRequest;
 import com.example.albam.domain.shift.dto.CreateShiftRequest;
+import com.example.albam.domain.shift.dto.RecurringShiftResult;
 import com.example.albam.domain.shift.dto.ShiftResponse;
+import com.example.albam.domain.shift.dto.SkippedShiftDate;
 import com.example.albam.domain.shift.dto.UpdateShiftRequest;
 import com.example.albam.domain.shift.entity.Shift;
 import com.example.albam.domain.shift.repository.ShiftRepository;
@@ -15,6 +18,8 @@ import com.example.albam.global.exception.NotFoundException;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ShiftService {
+
+    private static final int MAX_RECURRING_PERIOD_DAYS = 92;
 
     private final ShiftRepository shiftRepository;
     private final StoreMemberRepository storeMemberRepository;
@@ -38,6 +45,36 @@ public class ShiftService {
         Shift shift = shiftRepository.save(
                 new Shift(target, request.workDate(), request.startTime(), request.endTime()));
         return ShiftResponse.from(shift);
+    }
+
+    @Transactional
+    public RecurringShiftResult createRecurringShifts(Long storeId, Long userId,
+            CreateRecurringShiftRequest request) {
+        storeAuthorizationService.requireOwnerOrManager(storeId, userId);
+        StoreMember target = getStoreMemberInStore(storeId, request.storeMemberId());
+        if (request.periodEnd().isBefore(request.periodStart())) {
+            throw new InvalidRequestException("종료일은 시작일 이후여야 합니다.");
+        }
+        long periodDays = ChronoUnit.DAYS.between(request.periodStart(), request.periodEnd()) + 1;
+        if (periodDays > MAX_RECURRING_PERIOD_DAYS) {
+            throw new InvalidRequestException("반복 스케줄 생성 기간은 최대 " + MAX_RECURRING_PERIOD_DAYS + "일까지 가능합니다.");
+        }
+
+        List<ShiftResponse> created = new ArrayList<>();
+        List<SkippedShiftDate> skipped = new ArrayList<>();
+        for (LocalDate date = request.periodStart(); !date.isAfter(request.periodEnd()); date = date.plusDays(1)) {
+            if (!request.daysOfWeek().contains(date.getDayOfWeek())) {
+                continue;
+            }
+            try {
+                validateAvailability(target, date, request.startTime(), request.endTime());
+                Shift shift = shiftRepository.save(new Shift(target, date, request.startTime(), request.endTime()));
+                created.add(ShiftResponse.from(shift));
+            } catch (InvalidRequestException e) {
+                skipped.add(new SkippedShiftDate(date, e.getMessage()));
+            }
+        }
+        return new RecurringShiftResult(created, skipped);
     }
 
     public List<ShiftResponse> getShifts(Long storeId, Long userId, Long storeMemberId, LocalDate from,
