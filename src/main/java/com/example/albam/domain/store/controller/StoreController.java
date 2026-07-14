@@ -2,6 +2,7 @@ package com.example.albam.domain.store.controller;
 
 import com.example.albam.domain.store.dto.CreateStoreRequest;
 import com.example.albam.domain.store.dto.InviteCodeResponse;
+import com.example.albam.domain.store.dto.MyStoreResponse;
 import com.example.albam.domain.store.dto.StoreResponse;
 import com.example.albam.domain.store.dto.UpdateStoreRequest;
 import com.example.albam.domain.store.service.StoreService;
@@ -36,8 +37,9 @@ public class StoreController {
                 .body(ApiResponse.success(storeService.createStore(userId, request)));
     }
 
+    /** 내가 속한 매장 목록 (역할 무관, 재직 중인 매장만) + 각 매장에서의 내 역할. */
     @GetMapping
-    public ApiResponse<List<StoreResponse>> getMyStores(@CurrentUserId Long userId) {
+    public ApiResponse<List<MyStoreResponse>> getMyStores(@CurrentUserId Long userId) {
         return ApiResponse.success(storeService.getMyStores(userId));
     }
 

@@ -3,6 +3,7 @@ package com.example.albam.domain.store.service;
 import com.example.albam.domain.store.dto.BusinessHourRequest;
 import com.example.albam.domain.store.dto.CreateStoreRequest;
 import com.example.albam.domain.store.dto.InviteCodeResponse;
+import com.example.albam.domain.store.dto.MyStoreResponse;
 import com.example.albam.domain.store.dto.StoreResponse;
 import com.example.albam.domain.store.dto.UpdateStoreRequest;
 import com.example.albam.domain.store.entity.BusinessHour;
@@ -66,10 +67,9 @@ public class StoreService {
         return new InviteCodeResponse(store.getInviteCode());
     }
 
-    public List<StoreResponse> getMyStores(Long userId) {
+    public List<MyStoreResponse> getMyStores(Long userId) {
         return storeMemberRepository.findAllByUserIdAndStatus(userId, MemberStatus.ACTIVE).stream()
-                .map(StoreMember::getStore)
-                .map(StoreResponse::from)
+                .map(MyStoreResponse::from)
                 .toList();
     }
 
