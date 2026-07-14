@@ -65,6 +65,8 @@ final class PayrollCalculator {
         double overtimeHours = 0;
         double nightHours = 0;
         double holidayPremiumHours = 0;
+        double totalWorkedHours = 0;
+        double holidayWorkHours = 0;
         long weeklyHolidayPay = 0;
 
         for (Map.Entry<String, List<Attendance>> entry : attendancesByWeek.entrySet()) {
@@ -85,6 +87,7 @@ final class PayrollCalculator {
 
                 weekTotalHours += workedHours;
                 if (inMonth) {
+                    totalWorkedHours += workedHours;
                     nightHours += nightOverlapMinutes(start, end) / 60.0;
                 }
 
@@ -92,6 +95,7 @@ final class PayrollCalculator {
                     // 휴일근로는 연장 판정에서 제외하고, 기본급 1배 + 가산(8h까지 0.5배, 초과 1.0배)로 지급
                     if (inMonth) {
                         regularHours += workedHours;
+                        holidayWorkHours += workedHours;
                         holidayPremiumHours +=
                                 Math.min(workedHours, LaborStandards.STANDARD_DAILY_HOURS)
                                         * HOLIDAY_PREMIUM_MULTIPLIER
@@ -135,7 +139,8 @@ final class PayrollCalculator {
         long nightPay = smallBusiness ? 0 : Math.round(nightHours * hourlyWage * NIGHT_PREMIUM_MULTIPLIER);
         long holidayWorkPay = smallBusiness ? 0 : Math.round(holidayPremiumHours * hourlyWage);
 
-        return new PayrollResult(regularPay, overtimePay, nightPay, holidayWorkPay, weeklyHolidayPay);
+        return new PayrollResult(regularPay, overtimePay, nightPay, holidayWorkPay, weeklyHolidayPay,
+                totalWorkedHours, overtimeHours, nightHours, holidayWorkHours);
     }
 
     private static long nightOverlapMinutes(LocalDateTime start, LocalDateTime end) {
@@ -160,7 +165,9 @@ final class PayrollCalculator {
         return weekYear + "-" + weekOfYear;
     }
 
+    /** 금액과 함께 임금명세서의 "계산 방법" 기재에 필요한 시간 집계(대상 월 귀속분)를 담는다. */
     record PayrollResult(long regularPay, long overtimePay, long nightPay, long holidayWorkPay,
-            long weeklyHolidayPay) {
+            long weeklyHolidayPay, double totalWorkedHours, double overtimeHours, double nightHours,
+            double holidayWorkHours) {
     }
 }

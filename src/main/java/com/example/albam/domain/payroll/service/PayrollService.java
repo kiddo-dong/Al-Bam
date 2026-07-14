@@ -6,6 +6,7 @@ import com.example.albam.domain.attendance.repository.AttendanceRepository;
 import com.example.albam.domain.leave.repository.LeaveUsageRepository;
 import com.example.albam.domain.payroll.dto.PayrollEstimateResponse;
 import com.example.albam.domain.payroll.dto.PayrollResponse;
+import com.example.albam.domain.payroll.dto.PayslipResponse;
 import com.example.albam.domain.payroll.entity.Payroll;
 import com.example.albam.domain.payroll.repository.PayrollRepository;
 import com.example.albam.domain.payroll.service.PayrollCalculator.PayrollResult;
@@ -20,9 +21,11 @@ import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.exception.NotFoundException;
 import com.example.albam.global.labor.LaborStandards;
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -47,15 +50,7 @@ public class PayrollService {
         if (month < 1 || month > 12) {
             throw new InvalidRequestException("월은 1~12 사이여야 합니다.");
         }
-        StoreMember requester = storeAuthorizationService.requireMember(storeId, userId);
-        StoreMember target = storeMemberRepository.findById(memberId)
-                .orElseThrow(() -> new NotFoundException("멤버를 찾을 수 없습니다."));
-        if (!target.getStore().getId().equals(storeId)) {
-            throw new NotFoundException("멤버를 찾을 수 없습니다.");
-        }
-        if (!requester.getId().equals(target.getId()) && !requester.isOwnerOrManager()) {
-            throw new InvalidRequestException("본인 또는 매장 관리자만 조회할 수 있습니다.");
-        }
+        StoreMember target = getAuthorizedTarget(storeId, memberId, userId);
 
         YearMonth yearMonth = YearMonth.of(year, month);
         LocalDate monthStart = yearMonth.atDay(1);
@@ -91,6 +86,73 @@ public class PayrollService {
         payrollRepository.save(payroll);
 
         return PayrollResponse.from(payroll);
+    }
+
+    /** 급여명세서 상세: 항목별 금액 + 계산 근거(근로시간) + 공제 + 일별 근무 기록. */
+    public PayslipResponse getPayslip(Long storeId, Long memberId, Long userId, int year, int month) {
+        if (month < 1 || month > 12) {
+            throw new InvalidRequestException("월은 1~12 사이여야 합니다.");
+        }
+        StoreMember target = getAuthorizedTarget(storeId, memberId, userId);
+
+        YearMonth yearMonth = YearMonth.of(year, month);
+        LocalDate monthStart = yearMonth.atDay(1);
+        LocalDate monthEnd = yearMonth.atEndOfMonth();
+        LocalDate fetchFrom = monthStart.with(DayOfWeek.MONDAY);
+        LocalDate fetchTo = monthEnd.with(DayOfWeek.SUNDAY);
+
+        List<Attendance> attendances = attendanceRepository.findAllByStoreMemberIdAndStatusAndWorkDateBetween(
+                target.getId(), AttendanceStatus.DONE, fetchFrom, fetchTo);
+        List<Shift> shifts = shiftRepository
+                .findAllByStoreMemberIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(
+                        target.getId(), fetchFrom, fetchTo).stream()
+                .filter(shift -> shift.getStatus() != ShiftStatus.CANCELED)
+                .toList();
+        Set<LocalDate> scheduledDates = shifts.stream()
+                .map(Shift::getWorkDate)
+                .collect(Collectors.toSet());
+
+        PayrollResult result = PayrollCalculator.calculate(attendances, target.getHourlyWage(),
+                target.getStore().isSmallBusiness(), target.getWeeklyHolidayDay(), scheduledDates, yearMonth);
+        long leavePay = calculateLeavePay(target, shifts, monthStart, monthEnd);
+        long totalPay = result.regularPay() + result.overtimePay() + result.nightPay()
+                + result.holidayWorkPay() + result.weeklyHolidayPay() + leavePay;
+        long deduction = calculateDeduction(target.getTaxMode(), totalPay);
+
+        List<PayslipResponse.DailyWorkRecord> dailyRecords = attendances.stream()
+                .filter(attendance -> !attendance.getWorkDate().isBefore(monthStart)
+                        && !attendance.getWorkDate().isAfter(monthEnd))
+                .sorted(Comparator.comparing(Attendance::getClockInAt))
+                .map(attendance -> new PayslipResponse.DailyWorkRecord(
+                        attendance.getWorkDate(),
+                        attendance.getClockInAt(),
+                        attendance.getClockOutAt(),
+                        attendance.getBreakMinutes(),
+                        Math.max(Duration.between(attendance.getClockInAt(), attendance.getClockOutAt())
+                                .toMinutes() - attendance.getBreakMinutes(), 0)))
+                .toList();
+
+        return new PayslipResponse(target.getId(), target.getUser().getName(), target.getStore().getName(),
+                year, month, target.getHourlyWage(),
+                Math.round(result.totalWorkedHours() * 60), Math.round(result.overtimeHours() * 60),
+                Math.round(result.nightHours() * 60), Math.round(result.holidayWorkHours() * 60),
+                result.regularPay(), result.overtimePay(), result.nightPay(), result.holidayWorkPay(),
+                result.weeklyHolidayPay(), leavePay, totalPay, target.getTaxMode(), deduction,
+                totalPay - deduction, dailyRecords);
+    }
+
+    /** 대상 멤버 조회 + 접근 권한 확인 (본인 또는 매장 관리자). */
+    private StoreMember getAuthorizedTarget(Long storeId, Long memberId, Long userId) {
+        StoreMember requester = storeAuthorizationService.requireMember(storeId, userId);
+        StoreMember target = storeMemberRepository.findById(memberId)
+                .orElseThrow(() -> new NotFoundException("멤버를 찾을 수 없습니다."));
+        if (!target.getStore().getId().equals(storeId)) {
+            throw new NotFoundException("멤버를 찾을 수 없습니다.");
+        }
+        if (!requester.getId().equals(target.getId()) && !requester.isOwnerOrManager()) {
+            throw new InvalidRequestException("본인 또는 매장 관리자만 조회할 수 있습니다.");
+        }
+        return target;
     }
 
     /**
