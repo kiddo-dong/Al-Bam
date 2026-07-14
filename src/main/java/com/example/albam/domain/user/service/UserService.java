@@ -3,6 +3,7 @@ package com.example.albam.domain.user.service;
 import com.example.albam.domain.invite.repository.JoinRequestRepository;
 import com.example.albam.domain.storemember.entity.MemberStatus;
 import com.example.albam.domain.storemember.repository.StoreMemberRepository;
+import com.example.albam.domain.user.dto.CompleteProfileRequest;
 import com.example.albam.domain.user.dto.UpdateUserRequest;
 import com.example.albam.domain.user.dto.UserResponse;
 import com.example.albam.domain.user.entity.User;
@@ -31,6 +32,23 @@ public class UserService {
 
     public UserResponse getMe(Long userId) {
         return UserResponse.from(getUser(userId));
+    }
+
+    /**
+     * 소셜 가입 후 추가 정보 입력을 완료한다. 입력 도중 창이 닫혔더라도 재로그인 후
+     * profileCompleted=false를 보고 이 API로 이어서 완료할 수 있다.
+     */
+    @Transactional
+    public UserResponse completeProfile(Long userId, CompleteProfileRequest request) {
+        User user = getUser(userId);
+        if (user.isProfileCompleted()) {
+            throw new ConflictException("이미 프로필 입력이 완료된 계정입니다. 수정은 프로필 수정 API를 이용해 주세요.");
+        }
+        if (userRepository.existsByPhoneAndIdNot(request.phone(), userId)) {
+            throw new ConflictException("이미 사용 중인 전화번호입니다.");
+        }
+        user.completeProfile(request.name(), request.phone(), request.birthDate());
+        return UserResponse.from(user);
     }
 
     @Transactional

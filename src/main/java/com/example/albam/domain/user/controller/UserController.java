@@ -1,5 +1,6 @@
 package com.example.albam.domain.user.controller;
 
+import com.example.albam.domain.user.dto.CompleteProfileRequest;
 import com.example.albam.domain.user.dto.UpdateUserRequest;
 import com.example.albam.domain.user.dto.UserResponse;
 import com.example.albam.domain.user.service.UserService;
@@ -33,6 +34,12 @@ public class UserController {
     public ApiResponse<UserResponse> updateMe(@CurrentUserId Long userId,
             @Valid @RequestBody UpdateUserRequest request) {
         return ApiResponse.success(userService.updateMe(userId, request));
+    }
+
+    @PostMapping("/complete-profile")
+    public ApiResponse<UserResponse> completeProfile(@CurrentUserId Long userId,
+            @Valid @RequestBody CompleteProfileRequest request) {
+        return ApiResponse.success(userService.completeProfile(userId, request));
     }
 
     @DeleteMapping

@@ -9,10 +9,11 @@ public record UserResponse(
         String name,
         String phone,
         LocalDate birthDate,
-        String profileImageUrl
+        String profileImageUrl,
+        boolean profileCompleted
 ) {
     public static UserResponse from(User user) {
         return new UserResponse(user.getId(), user.getEmail(), user.getName(), user.getPhone(),
-                user.getBirthDate(), user.getProfileImageUrl());
+                user.getBirthDate(), user.getProfileImageUrl(), user.isProfileCompleted());
     }
 }

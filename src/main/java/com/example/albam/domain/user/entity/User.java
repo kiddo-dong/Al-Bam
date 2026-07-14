@@ -82,6 +82,24 @@ public class User extends BaseTimeEntity {
     }
 
     /**
+     * 프로필 입력 완료 여부. 소셜 가입 직후에는 전화번호·생년월일·약관동의가 비어 있으며,
+     * 입력 도중 창이 닫혀도 재로그인 후 이 값으로 미완성 상태를 감지해 이어서 입력받는다.
+     */
+    public boolean isProfileCompleted() {
+        return phone != null && birthDate != null && termsAgreedAt != null;
+    }
+
+    /** 소셜 가입 등으로 비어 있는 추가 정보를 채우고 약관 동의 시각을 기록한다. */
+    public void completeProfile(String name, String phone, LocalDate birthDate) {
+        if (name != null && !name.isBlank()) {
+            this.name = name;
+        }
+        this.phone = phone;
+        this.birthDate = birthDate;
+        this.termsAgreedAt = LocalDateTime.now();
+    }
+
+    /**
      * 탈퇴 처리: 개인정보를 익명화하고 로그인 불가능한 상태로 만든다.
      * 이메일은 unique 제약을 유지하면서 원래 주소를 해제하기 위해 대체 값으로 바꾼다.
      */
