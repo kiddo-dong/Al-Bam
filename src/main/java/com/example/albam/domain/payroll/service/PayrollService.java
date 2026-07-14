@@ -4,6 +4,7 @@ import com.example.albam.domain.attendance.entity.Attendance;
 import com.example.albam.domain.attendance.entity.AttendanceStatus;
 import com.example.albam.domain.attendance.repository.AttendanceRepository;
 import com.example.albam.domain.leave.repository.LeaveUsageRepository;
+import com.example.albam.domain.payroll.dto.PayrollEstimateResponse;
 import com.example.albam.domain.payroll.dto.PayrollResponse;
 import com.example.albam.domain.payroll.entity.Payroll;
 import com.example.albam.domain.payroll.repository.PayrollRepository;
@@ -21,6 +22,7 @@ import com.example.albam.global.labor.LaborStandards;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -89,6 +91,60 @@ public class PayrollService {
         payrollRepository.save(payroll);
 
         return PayrollResponse.from(payroll);
+    }
+
+    /**
+     * 본인 예상 급여 조회: 오늘까지의 실제 근태에, 아직 오지 않은 날짜의 비취소 스케줄을 전부
+     * 근무한다고 가정한 가상 근태를 더해 계산한다. 저장하지 않는 조회 전용 추정치다.
+     * (미래 스케줄 날짜는 출근한 것으로 간주하므로 주휴수당 개근 요건도 낙관적으로 평가된다)
+     */
+    public PayrollEstimateResponse estimateMyPayroll(Long storeId, Long userId, int year, int month) {
+        if (month < 1 || month > 12) {
+            throw new InvalidRequestException("월은 1~12 사이여야 합니다.");
+        }
+        StoreMember member = storeAuthorizationService.requireMember(storeId, userId);
+
+        YearMonth yearMonth = YearMonth.of(year, month);
+        LocalDate monthStart = yearMonth.atDay(1);
+        LocalDate monthEnd = yearMonth.atEndOfMonth();
+        LocalDate fetchFrom = monthStart.with(DayOfWeek.MONDAY);
+        LocalDate fetchTo = monthEnd.with(DayOfWeek.SUNDAY);
+        LocalDate today = LocalDate.now();
+
+        List<Attendance> attendances = new ArrayList<>(
+                attendanceRepository.findAllByStoreMemberIdAndStatusAndWorkDateBetween(
+                        member.getId(), AttendanceStatus.DONE, fetchFrom, fetchTo));
+        List<Shift> shifts = shiftRepository
+                .findAllByStoreMemberIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(
+                        member.getId(), fetchFrom, fetchTo).stream()
+                .filter(shift -> shift.getStatus() != ShiftStatus.CANCELED)
+                .toList();
+        for (Shift shift : shifts) {
+            if (shift.getWorkDate().isAfter(today)) {
+                attendances.add(syntheticAttendance(member, shift));
+            }
+        }
+        Set<LocalDate> scheduledDates = shifts.stream()
+                .map(Shift::getWorkDate)
+                .collect(Collectors.toSet());
+
+        PayrollResult result = PayrollCalculator.calculate(attendances, member.getHourlyWage(),
+                member.getStore().isSmallBusiness(), member.getWeeklyHolidayDay(), scheduledDates, yearMonth);
+        long leavePay = calculateLeavePay(member, shifts, monthStart, monthEnd);
+        long totalPay = result.regularPay() + result.overtimePay() + result.nightPay()
+                + result.holidayWorkPay() + result.weeklyHolidayPay() + leavePay;
+        long deduction = calculateDeduction(member.getTaxMode(), totalPay);
+
+        return new PayrollEstimateResponse(member.getId(), year, month, today,
+                result.regularPay(), result.overtimePay(), result.nightPay(), result.holidayWorkPay(),
+                result.weeklyHolidayPay(), leavePay, totalPay, deduction, totalPay - deduction);
+    }
+
+    /** 스케줄대로 근무한다고 가정한 가상 근태 (저장하지 않음). */
+    private Attendance syntheticAttendance(StoreMember member, Shift shift) {
+        Attendance attendance = new Attendance(member, shift.startDateTime());
+        attendance.correctTimes(shift.startDateTime(), shift.endDateTime(), shift.getBreakMinutes());
+        return attendance;
     }
 
     /**
