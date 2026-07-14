@@ -213,7 +213,7 @@ public class PayrollService {
      * 연차수당: 해당 월의 연차 사용일 x 1일 평균 스케줄 근무시간 x 시급.
      * 평균은 그 달의 비취소 스케줄로 계산하고, 스케줄이 없으면 법정 1일 기준(8시간)을 쓴다.
      */
-    private long calculateLeavePay(StoreMember member, List<Shift> shifts, LocalDate monthStart,
+    long calculateLeavePay(StoreMember member, List<Shift> shifts, LocalDate monthStart,
             LocalDate monthEnd) {
         long leaveDays = leaveUsageRepository.countByStoreMemberIdAndLeaveDateBetween(
                 member.getId(), monthStart, monthEnd);
@@ -231,7 +231,7 @@ public class PayrollService {
         return Math.round(leaveDays * dailyHours * member.getHourlyWage());
     }
 
-    private long calculateDeduction(TaxMode taxMode, long grossPay) {
+    long calculateDeduction(TaxMode taxMode, long grossPay) {
         return switch (taxMode) {
             case NONE -> 0;
             case WITHHOLDING_3_3 -> Math.round(grossPay * LaborStandards.WITHHOLDING_TAX_RATE);
