@@ -13,7 +13,6 @@ import com.example.albam.domain.user.oauth.OAuthUserInfoFetcher;
 import com.example.albam.domain.user.repository.EmailTokenRepository;
 import com.example.albam.domain.user.repository.UserRepository;
 import com.example.albam.global.exception.ConflictException;
-import com.example.albam.global.exception.ErrorCode;
 import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.mail.MailService;
 import com.example.albam.global.security.JwtTokenProvider;
@@ -23,6 +22,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -141,8 +141,9 @@ public class AuthService {
     }
 
     public TokenResponse login(LoginRequest request) {
+        // 비밀번호 오류와 동일한 401 응답을 내려 계정 존재 여부를 노출하지 않는다
         User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new InvalidRequestException(ErrorCode.UNAUTHORIZED.getDefaultMessage()));
+                .orElseThrow(() -> new BadCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다."));
         if (user.getProvider() != AuthProvider.LOCAL) {
             throw new InvalidRequestException(
                     user.getProvider() + " 소셜 로그인으로 가입된 계정입니다. 소셜 로그인을 이용해 주세요.");

@@ -1,9 +1,11 @@
 package com.example.albam.domain.user.service;
 
+import com.example.albam.domain.invite.repository.JoinRequestRepository;
 import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.user.dto.UpdateUserRequest;
 import com.example.albam.domain.user.dto.UserResponse;
 import com.example.albam.domain.user.entity.User;
+import com.example.albam.domain.user.repository.EmailTokenRepository;
 import com.example.albam.domain.user.repository.UserRepository;
 import com.example.albam.global.exception.ConflictException;
 import com.example.albam.global.exception.NotFoundException;
@@ -22,6 +24,8 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final StoreMemberRepository storeMemberRepository;
+    private final EmailTokenRepository emailTokenRepository;
+    private final JoinRequestRepository joinRequestRepository;
     private final S3Uploader s3Uploader;
 
     public UserResponse getMe(Long userId) {
@@ -45,6 +49,9 @@ public class UserService {
         }
         User user = getUser(userId);
         s3Uploader.delete(user.getProfileImageUrl());
+        // 유저를 FK로 참조하는 부속 데이터를 먼저 정리해야 삭제할 수 있다
+        emailTokenRepository.deleteByUserId(userId);
+        joinRequestRepository.deleteByUserId(userId);
         userRepository.delete(user);
     }
 

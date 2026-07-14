@@ -3,6 +3,7 @@ package com.example.albam.domain.attendance.controller;
 import com.example.albam.domain.attendance.dto.AttendanceReportEntry;
 import com.example.albam.domain.attendance.dto.AttendanceResponse;
 import com.example.albam.domain.attendance.dto.CorrectAttendanceRequest;
+import com.example.albam.domain.attendance.dto.CreateAttendanceRequest;
 import com.example.albam.domain.attendance.service.AttendanceReportService;
 import com.example.albam.domain.attendance.service.AttendanceService;
 import com.example.albam.global.common.ApiResponse;
@@ -12,6 +13,8 @@ import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -29,6 +32,13 @@ public class AttendanceController {
 
     private final AttendanceService attendanceService;
     private final AttendanceReportService attendanceReportService;
+
+    @PostMapping
+    public ResponseEntity<ApiResponse<AttendanceResponse>> createAttendance(@PathVariable Long storeId,
+            @CurrentUserId Long userId, @Valid @RequestBody CreateAttendanceRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(attendanceService.createAttendance(storeId, userId, request)));
+    }
 
     @PostMapping("/clock-in")
     public ApiResponse<AttendanceResponse> clockIn(@PathVariable Long storeId, @CurrentUserId Long userId) {

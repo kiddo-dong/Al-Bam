@@ -42,6 +42,9 @@ public class PayrollService {
 
     @Transactional
     public PayrollResponse getPayroll(Long storeId, Long memberId, Long userId, int year, int month) {
+        if (month < 1 || month > 12) {
+            throw new InvalidRequestException("월은 1~12 사이여야 합니다.");
+        }
         StoreMember requester = storeAuthorizationService.requireMember(storeId, userId);
         StoreMember target = storeMemberRepository.findById(memberId)
                 .orElseThrow(() -> new NotFoundException("멤버를 찾을 수 없습니다."));

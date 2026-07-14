@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface EmailTokenRepository extends JpaRepository<EmailToken, Long> {
 
     Optional<EmailToken> findByTokenAndType(String token, EmailTokenType type);
+
+    void deleteByUserId(Long userId);
 }

@@ -43,6 +43,12 @@ public class StoreMemberController {
         return ApiResponse.success(storeMemberService.updateMyAvailableDays(storeId, userId, request));
     }
 
+    @DeleteMapping("/me")
+    public ApiResponse<Void> leaveStore(@PathVariable Long storeId, @CurrentUserId Long userId) {
+        storeMemberService.leaveStore(storeId, userId);
+        return ApiResponse.ok();
+    }
+
     @DeleteMapping("/{memberId}")
     public ApiResponse<Void> removeMember(@PathVariable Long storeId, @PathVariable Long memberId,
             @CurrentUserId Long userId) {

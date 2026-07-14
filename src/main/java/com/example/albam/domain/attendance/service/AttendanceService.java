@@ -2,11 +2,13 @@ package com.example.albam.domain.attendance.service;
 
 import com.example.albam.domain.attendance.dto.AttendanceResponse;
 import com.example.albam.domain.attendance.dto.CorrectAttendanceRequest;
+import com.example.albam.domain.attendance.dto.CreateAttendanceRequest;
 import com.example.albam.domain.attendance.entity.Attendance;
 import com.example.albam.domain.attendance.entity.AttendanceStatus;
 import com.example.albam.domain.attendance.repository.AttendanceRepository;
 import com.example.albam.domain.store.entity.BreakPolicy;
 import com.example.albam.domain.storemember.entity.StoreMember;
+import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.exception.NotFoundException;
@@ -25,7 +27,26 @@ import org.springframework.transaction.annotation.Transactional;
 public class AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
+    private final StoreMemberRepository storeMemberRepository;
     private final StoreAuthorizationService storeAuthorizationService;
+
+    /** 관리자가 누락된 근태를 수동으로 등록한다 (직원이 출근을 아예 찍지 못한 경우). */
+    @Transactional
+    public AttendanceResponse createAttendance(Long storeId, Long userId, CreateAttendanceRequest request) {
+        storeAuthorizationService.requireOwnerOrManager(storeId, userId);
+        StoreMember target = storeMemberRepository.findById(request.storeMemberId())
+                .orElseThrow(() -> new NotFoundException("멤버를 찾을 수 없습니다."));
+        if (!target.getStore().getId().equals(storeId)) {
+            throw new NotFoundException("멤버를 찾을 수 없습니다.");
+        }
+        Attendance attendance = new Attendance(target, request.clockInAt());
+        if (request.clockOutAt() != null) {
+            int breakMinutes = resolveBreakMinutes(target, request.clockInAt(), request.clockOutAt(),
+                    request.breakMinutes());
+            attendance.correctTimes(request.clockInAt(), request.clockOutAt(), breakMinutes);
+        }
+        return AttendanceResponse.from(attendanceRepository.save(attendance));
+    }
 
     @Transactional
     public AttendanceResponse clockIn(Long storeId, Long userId) {

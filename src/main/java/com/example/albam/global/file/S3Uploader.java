@@ -49,15 +49,15 @@ public class S3Uploader {
         if (fileUrl == null) {
             return;
         }
+        int index = fileUrl.indexOf(AMAZON_S3_HOST);
+        if (index < 0) {
+            // 우리가 관리하는 S3 URL 형식이 아니면 무시한다
+            return;
+        }
         s3Client.deleteObject(DeleteObjectRequest.builder()
                 .bucket(bucketName)
-                .key(extractKey(fileUrl))
+                .key(fileUrl.substring(index + AMAZON_S3_HOST.length()))
                 .build());
-    }
-
-    private String extractKey(String fileUrl) {
-        int index = fileUrl.indexOf(AMAZON_S3_HOST);
-        return fileUrl.substring(index + AMAZON_S3_HOST.length());
     }
 
     private String sanitizeFilename(String originalFilename) {

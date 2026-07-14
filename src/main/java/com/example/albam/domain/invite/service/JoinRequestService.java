@@ -14,6 +14,7 @@ import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.domain.user.entity.User;
 import com.example.albam.domain.user.repository.UserRepository;
 import com.example.albam.global.exception.ConflictException;
+import com.example.albam.global.exception.ForbiddenException;
 import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.exception.NotFoundException;
 import java.util.List;
@@ -49,6 +50,25 @@ public class JoinRequestService {
                 .orElseThrow(() -> new NotFoundException("사용자를 찾을 수 없습니다."));
         JoinRequest joinRequest = joinRequestRepository.save(new JoinRequest(store, user));
         return JoinRequestResponse.from(joinRequest);
+    }
+
+    public List<JoinRequestResponse> getMyRequests(Long userId) {
+        return joinRequestRepository.findAllByUserIdOrderByRequestedAtDesc(userId).stream()
+                .map(JoinRequestResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public void cancelMyRequest(Long requestId, Long userId) {
+        JoinRequest joinRequest = joinRequestRepository.findById(requestId)
+                .orElseThrow(() -> new NotFoundException("가입 신청을 찾을 수 없습니다."));
+        if (!joinRequest.getUser().getId().equals(userId)) {
+            throw new ForbiddenException("본인의 가입 신청만 취소할 수 있습니다.");
+        }
+        if (joinRequest.getStatus() != JoinRequestStatus.PENDING) {
+            throw new InvalidRequestException("대기 중인 신청만 취소할 수 있습니다.");
+        }
+        joinRequestRepository.delete(joinRequest);
     }
 
     public List<JoinRequestResponse> getPendingRequests(Long storeId, Long userId) {

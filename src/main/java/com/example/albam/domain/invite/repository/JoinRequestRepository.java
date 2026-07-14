@@ -13,4 +13,8 @@ public interface JoinRequestRepository extends JpaRepository<JoinRequest, Long> 
     boolean existsByStoreIdAndUserIdAndStatus(Long storeId, Long userId, JoinRequestStatus status);
 
     List<JoinRequest> findAllByStoreIdAndStatusOrderByRequestedAtAsc(Long storeId, JoinRequestStatus status);
+
+    List<JoinRequest> findAllByUserIdOrderByRequestedAtDesc(Long userId);
+
+    void deleteByUserId(Long userId);
 }

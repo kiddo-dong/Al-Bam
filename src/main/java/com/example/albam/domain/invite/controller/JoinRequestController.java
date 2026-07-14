@@ -11,6 +11,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,6 +30,17 @@ public class JoinRequestController {
             @Valid @RequestBody JoinRequestByCodeRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(joinRequestService.requestJoin(userId, request.code())));
+    }
+
+    @GetMapping("/api/join-requests/me")
+    public ApiResponse<List<JoinRequestResponse>> getMyRequests(@CurrentUserId Long userId) {
+        return ApiResponse.success(joinRequestService.getMyRequests(userId));
+    }
+
+    @DeleteMapping("/api/join-requests/{requestId}")
+    public ApiResponse<Void> cancelMyRequest(@PathVariable Long requestId, @CurrentUserId Long userId) {
+        joinRequestService.cancelMyRequest(requestId, userId);
+        return ApiResponse.ok();
     }
 
     @GetMapping("/api/stores/{storeId}/join-requests")

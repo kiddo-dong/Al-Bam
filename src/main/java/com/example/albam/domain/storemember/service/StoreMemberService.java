@@ -72,6 +72,15 @@ public class StoreMemberService {
     }
 
     @Transactional
+    public void leaveStore(Long storeId, Long userId) {
+        StoreMember member = storeAuthorizationService.requireMember(storeId, userId);
+        if (member.getRole() == MemberRole.OWNER) {
+            throw new ForbiddenException("매장 소유자는 매장을 나갈 수 없습니다. 매장 삭제를 이용해 주세요.");
+        }
+        storeMemberRepository.delete(member);
+    }
+
+    @Transactional
     public void removeMember(Long storeId, Long memberId, Long userId) {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         StoreMember target = getStoreMember(storeId, memberId);
