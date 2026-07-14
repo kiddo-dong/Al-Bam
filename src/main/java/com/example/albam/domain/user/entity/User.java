@@ -50,6 +50,10 @@ public class User extends BaseTimeEntity {
     @Column(name = "provider_id")
     private String providerId;
 
+    /** 이메일 인증 여부. 소셜 가입은 provider가 이미 검증했으므로 true로 시작한다. */
+    @Column(nullable = false)
+    private boolean emailVerified;
+
     public User(String email, String password, String name, String phone, LocalDate birthDate,
             LocalDateTime termsAgreedAt) {
         this.email = email;
@@ -59,6 +63,7 @@ public class User extends BaseTimeEntity {
         this.birthDate = birthDate;
         this.termsAgreedAt = termsAgreedAt;
         this.provider = AuthProvider.LOCAL;
+        this.emailVerified = false;
     }
 
     public User(String email, String name, AuthProvider provider, String providerId) {
@@ -66,6 +71,11 @@ public class User extends BaseTimeEntity {
         this.name = name;
         this.provider = provider;
         this.providerId = providerId;
+        this.emailVerified = true;
+    }
+
+    public void markEmailVerified() {
+        this.emailVerified = true;
     }
 
     public void changePassword(String encodedPassword) {
