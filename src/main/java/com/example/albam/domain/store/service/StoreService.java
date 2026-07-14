@@ -15,6 +15,7 @@ import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.domain.user.entity.User;
 import com.example.albam.domain.user.repository.UserRepository;
+import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.exception.NotFoundException;
 import java.security.SecureRandom;
 import java.time.DayOfWeek;
@@ -87,10 +88,16 @@ public class StoreService {
         return StoreResponse.from(store);
     }
 
+    /** 매장 삭제는 되돌릴 수 없으므로, 실수 방지를 위해 매장 이름을 정확히 입력해야 실행된다. */
     @Transactional
-    public void deleteStore(Long storeId, Long userId) {
+    public void deleteStore(Long storeId, Long userId, String confirmName) {
         storeAuthorizationService.requireOwner(storeId, userId);
-        storeRepository.deleteById(storeId);
+        Store store = getStoreEntity(storeId);
+        if (!store.getName().equals(confirmName)) {
+            throw new InvalidRequestException(
+                    "매장 이름이 일치하지 않습니다. 삭제하려면 매장 이름(" + store.getName() + ")을 정확히 입력해 주세요.");
+        }
+        storeRepository.delete(store);
     }
 
     private Store getStoreEntity(Long storeId) {
