@@ -3,6 +3,7 @@ package com.example.albam.domain.storemember.entity;
 import com.example.albam.domain.store.entity.Store;
 import com.example.albam.domain.user.entity.User;
 import com.example.albam.global.common.BaseTimeEntity;
+import com.example.albam.global.exception.InvalidRequestException;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -57,6 +58,9 @@ public class StoreMember extends BaseTimeEntity {
     @Column(nullable = false)
     private LocalDateTime joinedAt;
 
+    /** 퇴사 처리 시각. ACTIVE 상태에서는 null. */
+    private LocalDateTime resignedAt;
+
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "store_member_available_days", joinColumns = @JoinColumn(name = "store_member_id"))
     @Column(name = "day_of_week")
@@ -92,6 +96,22 @@ public class StoreMember extends BaseTimeEntity {
 
     public void changeStatus(MemberStatus status) {
         this.status = status;
+        this.resignedAt = status == MemberStatus.INACTIVE ? LocalDateTime.now() : null;
+    }
+
+    /** 퇴사 처리: 근무 이력(근태·급여)을 보존하기 위해 행을 지우지 않고 비활성화한다. */
+    public void resign() {
+        if (this.status == MemberStatus.INACTIVE) {
+            throw new InvalidRequestException("이미 퇴사 처리된 멤버입니다.");
+        }
+        changeStatus(MemberStatus.INACTIVE);
+    }
+
+    /** 재입사: 퇴사했던 멤버를 새 역할로 다시 활성화한다. */
+    public void rejoin(MemberRole role) {
+        this.role = role;
+        this.joinedAt = LocalDateTime.now();
+        changeStatus(MemberStatus.ACTIVE);
     }
 
     public void changeAvailableDays(Set<DayOfWeek> availableDays) {

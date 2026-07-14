@@ -54,6 +54,9 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false)
     private boolean emailVerified;
 
+    /** 탈퇴 시각. 근무 이력 보존을 위해 행을 지우지 않고 개인정보만 익명화한다. */
+    private LocalDateTime deletedAt;
+
     public User(String email, String password, String name, String phone, LocalDate birthDate,
             LocalDateTime termsAgreedAt) {
         this.email = email;
@@ -76,6 +79,22 @@ public class User extends BaseTimeEntity {
 
     public void markEmailVerified() {
         this.emailVerified = true;
+    }
+
+    /**
+     * 탈퇴 처리: 개인정보를 익명화하고 로그인 불가능한 상태로 만든다.
+     * 이메일은 unique 제약을 유지하면서 원래 주소를 해제하기 위해 대체 값으로 바꾼다.
+     */
+    public void anonymizeForWithdrawal() {
+        this.email = "deleted-" + id + "@withdrawn.albam";
+        this.name = "탈퇴회원";
+        this.password = null;
+        this.phone = null;
+        this.birthDate = null;
+        this.profileImageUrl = null;
+        this.providerId = null;
+        this.emailVerified = false;
+        this.deletedAt = LocalDateTime.now();
     }
 
     public void changePassword(String encodedPassword) {

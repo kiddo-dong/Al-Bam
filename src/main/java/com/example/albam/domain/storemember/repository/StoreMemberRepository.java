@@ -1,5 +1,6 @@
 package com.example.albam.domain.storemember.repository;
 
+import com.example.albam.domain.storemember.entity.MemberStatus;
 import com.example.albam.domain.storemember.entity.StoreMember;
 import java.util.List;
 import java.util.Optional;
@@ -11,9 +12,9 @@ public interface StoreMemberRepository extends JpaRepository<StoreMember, Long> 
 
     List<StoreMember> findAllByStoreId(Long storeId);
 
-    List<StoreMember> findAllByUserId(Long userId);
+    List<StoreMember> findAllByUserIdAndStatus(Long userId, MemberStatus status);
 
-    boolean existsByStoreIdAndUserId(Long storeId, Long userId);
+    boolean existsByStoreIdAndUserIdAndStatus(Long storeId, Long userId, MemberStatus status);
 
-    boolean existsByUserId(Long userId);
+    boolean existsByUserIdAndStatus(Long userId, MemberStatus status);
 }

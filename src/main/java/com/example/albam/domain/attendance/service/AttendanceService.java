@@ -7,6 +7,7 @@ import com.example.albam.domain.attendance.entity.Attendance;
 import com.example.albam.domain.attendance.entity.AttendanceStatus;
 import com.example.albam.domain.attendance.repository.AttendanceRepository;
 import com.example.albam.domain.store.entity.BreakPolicy;
+import com.example.albam.domain.storemember.entity.MemberStatus;
 import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
@@ -38,6 +39,9 @@ public class AttendanceService {
                 .orElseThrow(() -> new NotFoundException("멤버를 찾을 수 없습니다."));
         if (!target.getStore().getId().equals(storeId)) {
             throw new NotFoundException("멤버를 찾을 수 없습니다.");
+        }
+        if (target.getStatus() != MemberStatus.ACTIVE) {
+            throw new InvalidRequestException("퇴사 처리된 멤버에게는 근태를 등록할 수 없습니다.");
         }
         Attendance attendance = new Attendance(target, request.clockInAt());
         if (request.clockOutAt() != null) {

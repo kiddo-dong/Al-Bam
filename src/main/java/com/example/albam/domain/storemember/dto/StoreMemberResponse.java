@@ -17,6 +17,7 @@ public record StoreMemberResponse(
         int hourlyWage,
         MemberStatus status,
         LocalDateTime joinedAt,
+        LocalDateTime resignedAt,
         Set<DayOfWeek> availableDays,
         DayOfWeek weeklyHolidayDay,
         TaxMode taxMode
@@ -31,6 +32,7 @@ public record StoreMemberResponse(
                 member.getHourlyWage(),
                 member.getStatus(),
                 member.getJoinedAt(),
+                member.getResignedAt(),
                 member.getAvailableDays(),
                 member.getWeeklyHolidayDay(),
                 member.getTaxMode()

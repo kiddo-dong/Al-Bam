@@ -1,6 +1,7 @@
 package com.example.albam.domain.storemember.service;
 
 import com.example.albam.domain.storemember.entity.MemberRole;
+import com.example.albam.domain.storemember.entity.MemberStatus;
 import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.global.exception.ForbiddenException;
@@ -17,8 +18,12 @@ public class StoreAuthorizationService {
     private final StoreMemberRepository storeMemberRepository;
 
     public StoreMember requireMember(Long storeId, Long userId) {
-        return storeMemberRepository.findByStoreIdAndUserId(storeId, userId)
+        StoreMember member = storeMemberRepository.findByStoreIdAndUserId(storeId, userId)
                 .orElseThrow(() -> new ForbiddenException("해당 매장의 멤버가 아닙니다."));
+        if (member.getStatus() != MemberStatus.ACTIVE) {
+            throw new ForbiddenException("퇴사 처리된 멤버는 매장 기능을 이용할 수 없습니다.");
+        }
+        return member;
     }
 
     public StoreMember requireOwnerOrManager(Long storeId, Long userId) {

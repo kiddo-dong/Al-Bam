@@ -9,6 +9,7 @@ import com.example.albam.domain.store.entity.BusinessHour;
 import com.example.albam.domain.store.entity.Store;
 import com.example.albam.domain.store.repository.StoreRepository;
 import com.example.albam.domain.storemember.entity.MemberRole;
+import com.example.albam.domain.storemember.entity.MemberStatus;
 import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
@@ -65,7 +66,7 @@ public class StoreService {
     }
 
     public List<StoreResponse> getMyStores(Long userId) {
-        return storeMemberRepository.findAllByUserId(userId).stream()
+        return storeMemberRepository.findAllByUserIdAndStatus(userId, MemberStatus.ACTIVE).stream()
                 .map(StoreMember::getStore)
                 .map(StoreResponse::from)
                 .toList();

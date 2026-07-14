@@ -1,6 +1,7 @@
 package com.example.albam.domain.user.service;
 
 import com.example.albam.domain.invite.repository.JoinRequestRepository;
+import com.example.albam.domain.storemember.entity.MemberStatus;
 import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.user.dto.UpdateUserRequest;
 import com.example.albam.domain.user.dto.UserResponse;
@@ -42,17 +43,20 @@ public class UserService {
         return UserResponse.from(user);
     }
 
+    /**
+     * 탈퇴: 근무 이력(근태·급여)이 StoreMember를 통해 유저를 참조하므로 행을 지우지 않고
+     * 개인정보를 익명화한다 (soft delete). 활동 중인 매장이 있으면 먼저 나가야 한다.
+     */
     @Transactional
     public void withdraw(Long userId) {
-        if (storeMemberRepository.existsByUserId(userId)) {
+        if (storeMemberRepository.existsByUserIdAndStatus(userId, MemberStatus.ACTIVE)) {
             throw new ConflictException("소속된 매장이 있으면 탈퇴할 수 없습니다. 매장을 먼저 나가거나 삭제해 주세요.");
         }
         User user = getUser(userId);
         s3Uploader.delete(user.getProfileImageUrl());
-        // 유저를 FK로 참조하는 부속 데이터를 먼저 정리해야 삭제할 수 있다
         emailTokenRepository.deleteByUserId(userId);
         joinRequestRepository.deleteByUserId(userId);
-        userRepository.delete(user);
+        user.anonymizeForWithdrawal();
     }
 
     @Transactional

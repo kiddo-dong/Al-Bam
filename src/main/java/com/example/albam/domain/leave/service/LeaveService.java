@@ -5,6 +5,7 @@ import com.example.albam.domain.leave.dto.LeaveUsageResponse;
 import com.example.albam.domain.leave.dto.UseLeaveRequest;
 import com.example.albam.domain.leave.entity.LeaveUsage;
 import com.example.albam.domain.leave.repository.LeaveUsageRepository;
+import com.example.albam.domain.storemember.entity.MemberStatus;
 import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
@@ -57,6 +58,9 @@ public class LeaveService {
     public LeaveUsageResponse useLeave(Long storeId, Long memberId, Long userId, UseLeaveRequest request) {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         StoreMember target = getMemberInStore(storeId, memberId);
+        if (target.getStatus() != MemberStatus.ACTIVE) {
+            throw new InvalidRequestException("퇴사 처리된 멤버에게는 연차를 사용할 수 없습니다.");
+        }
         if (leaveUsageRepository.existsByStoreMemberIdAndLeaveDate(target.getId(), request.leaveDate())) {
             throw new ConflictException("해당 날짜에 이미 연차가 사용되었습니다.");
         }

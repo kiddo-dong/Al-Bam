@@ -12,6 +12,7 @@ import com.example.albam.domain.shift.repository.ShiftRepository;
 import com.example.albam.domain.store.entity.BreakPolicy;
 import com.example.albam.domain.store.entity.BusinessHour;
 import com.example.albam.domain.store.entity.Store;
+import com.example.albam.domain.storemember.entity.MemberStatus;
 import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
@@ -139,6 +140,9 @@ public class ShiftService {
                 .orElseThrow(() -> new NotFoundException("멤버를 찾을 수 없습니다."));
         if (!member.getStore().getId().equals(storeId)) {
             throw new InvalidRequestException("해당 매장의 멤버가 아닙니다.");
+        }
+        if (member.getStatus() != MemberStatus.ACTIVE) {
+            throw new InvalidRequestException("퇴사 처리된 멤버에게는 스케줄을 배정할 수 없습니다.");
         }
         return member;
     }

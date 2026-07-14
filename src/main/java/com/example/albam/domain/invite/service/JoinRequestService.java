@@ -8,6 +8,7 @@ import com.example.albam.domain.invite.repository.JoinRequestRepository;
 import com.example.albam.domain.store.entity.Store;
 import com.example.albam.domain.store.repository.StoreRepository;
 import com.example.albam.domain.storemember.entity.MemberRole;
+import com.example.albam.domain.storemember.entity.MemberStatus;
 import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
@@ -39,7 +40,8 @@ public class JoinRequestService {
     public JoinRequestResponse requestJoin(Long userId, String code) {
         Store store = storeRepository.findByInviteCode(code)
                 .orElseThrow(() -> new NotFoundException("유효하지 않은 초대코드입니다."));
-        if (storeMemberRepository.existsByStoreIdAndUserId(store.getId(), userId)) {
+        if (storeMemberRepository.existsByStoreIdAndUserIdAndStatus(store.getId(), userId,
+                MemberStatus.ACTIVE)) {
             throw new ConflictException("이미 해당 매장의 멤버입니다.");
         }
         if (joinRequestRepository.existsByStoreIdAndUserIdAndStatus(store.getId(), userId,
@@ -88,8 +90,19 @@ public class JoinRequestService {
         }
         JoinRequest joinRequest = getJoinRequest(storeId, requestId);
         joinRequest.approve(request.role());
-        storeMemberRepository.save(
-                new StoreMember(joinRequest.getStore(), joinRequest.getUser(), request.role(), DEFAULT_WAGE));
+        // 퇴사했던 멤버가 다시 합류하면 기존 행(근무 이력 포함)을 재활성화한다
+        StoreMember existing = storeMemberRepository
+                .findByStoreIdAndUserId(storeId, joinRequest.getUser().getId())
+                .orElse(null);
+        if (existing != null) {
+            if (existing.getStatus() == MemberStatus.ACTIVE) {
+                throw new ConflictException("이미 해당 매장의 멤버입니다.");
+            }
+            existing.rejoin(request.role());
+        } else {
+            storeMemberRepository.save(
+                    new StoreMember(joinRequest.getStore(), joinRequest.getUser(), request.role(), DEFAULT_WAGE));
+        }
         return JoinRequestResponse.from(joinRequest);
     }
 
