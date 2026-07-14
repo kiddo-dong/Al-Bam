@@ -1,9 +1,11 @@
 package com.example.albam.domain.storemember.service;
 
 import com.example.albam.domain.storemember.dto.StoreMemberResponse;
+import com.example.albam.domain.storemember.dto.StoreMemberSummaryResponse;
 import com.example.albam.domain.storemember.dto.UpdateAvailableDaysRequest;
 import com.example.albam.domain.storemember.dto.UpdateStoreMemberRequest;
 import com.example.albam.domain.storemember.entity.MemberRole;
+import com.example.albam.domain.storemember.entity.MemberStatus;
 import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.global.exception.ForbiddenException;
@@ -23,10 +25,20 @@ public class StoreMemberService {
     private final StoreMemberRepository storeMemberRepository;
     private final StoreAuthorizationService storeAuthorizationService;
 
+    /** 멤버 전체 상세 목록 (시급·이메일·공제방식 등 민감정보 포함) — OWNER 전용. */
     public List<StoreMemberResponse> getMembers(Long storeId, Long userId) {
-        storeAuthorizationService.requireMember(storeId, userId);
+        storeAuthorizationService.requireOwner(storeId, userId);
         return storeMemberRepository.findAllByStoreId(storeId).stream()
                 .map(StoreMemberResponse::from)
+                .toList();
+    }
+
+    /** 멤버 요약 목록 (이름·역할만, 재직자만) — 매장 멤버 누구나 조회 가능. */
+    public List<StoreMemberSummaryResponse> getMemberSummaries(Long storeId, Long userId) {
+        storeAuthorizationService.requireMember(storeId, userId);
+        return storeMemberRepository.findAllByStoreId(storeId).stream()
+                .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
+                .map(StoreMemberSummaryResponse::from)
                 .toList();
     }
 

@@ -1,6 +1,7 @@
 package com.example.albam.domain.storemember.controller;
 
 import com.example.albam.domain.storemember.dto.StoreMemberResponse;
+import com.example.albam.domain.storemember.dto.StoreMemberSummaryResponse;
 import com.example.albam.domain.storemember.dto.UpdateAvailableDaysRequest;
 import com.example.albam.domain.storemember.dto.UpdateStoreMemberRequest;
 import com.example.albam.domain.storemember.service.StoreMemberService;
@@ -24,10 +25,18 @@ public class StoreMemberController {
 
     private final StoreMemberService storeMemberService;
 
+    /** 전체 상세 목록 (민감정보 포함) — OWNER 전용. */
     @GetMapping
     public ApiResponse<List<StoreMemberResponse>> getMembers(@PathVariable Long storeId,
             @CurrentUserId Long userId) {
         return ApiResponse.success(storeMemberService.getMembers(storeId, userId));
+    }
+
+    /** 이름·역할만 담은 요약 목록 — 매장 멤버 누구나. */
+    @GetMapping("/summary")
+    public ApiResponse<List<StoreMemberSummaryResponse>> getMemberSummaries(@PathVariable Long storeId,
+            @CurrentUserId Long userId) {
+        return ApiResponse.success(storeMemberService.getMemberSummaries(storeId, userId));
     }
 
     @PatchMapping("/{memberId}")
