@@ -69,7 +69,7 @@ public class AuthService {
     private void sendVerificationMail(User user) {
         EmailToken token = emailTokenRepository.save(new EmailToken(user, UUID.randomUUID().toString(),
                 EmailTokenType.VERIFY_EMAIL, LocalDateTime.now().plusHours(VERIFY_EMAIL_EXPIRATION_HOURS)));
-        String link = baseUrl + "/api/auth/verify-email?token=" + token.getToken();
+        String link = baseUrl + "/api/v1/auth/verify-email?token=" + token.getToken();
         mailService.send(user.getEmail(), "[알밤] 이메일 인증을 완료해 주세요",
                 user.getName() + "님, 알밤 가입을 환영합니다!\n\n"
                         + "아래 링크를 클릭해 이메일 인증을 완료해 주세요. (24시간 이내)\n" + link);
@@ -109,7 +109,7 @@ public class AuthService {
                             user.getName() + "님, 비밀번호 재설정 요청이 접수되었습니다.\n\n"
                                     + "아래 토큰으로 30분 이내에 새 비밀번호를 설정해 주세요.\n"
                                     + "토큰: " + token.getToken() + "\n\n"
-                                    + "재설정 주소: " + baseUrl + "/api/auth/password-reset/confirm\n"
+                                    + "재설정 주소: " + baseUrl + "/api/v1/auth/password-reset/confirm\n"
                                     + "본인이 요청하지 않았다면 이 메일을 무시하세요.");
                 });
     }

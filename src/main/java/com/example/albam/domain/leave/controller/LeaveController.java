@@ -23,13 +23,13 @@ public class LeaveController {
 
     private final LeaveService leaveService;
 
-    @GetMapping("/api/stores/{storeId}/members/{memberId}/leaves")
+    @GetMapping("/api/v1/stores/{storeId}/members/{memberId}/leaves")
     public ApiResponse<LeaveStatusResponse> getLeaveStatus(@PathVariable Long storeId,
             @PathVariable Long memberId, @CurrentUserId Long userId) {
         return ApiResponse.success(leaveService.getLeaveStatus(storeId, memberId, userId));
     }
 
-    @PostMapping("/api/stores/{storeId}/members/{memberId}/leaves")
+    @PostMapping("/api/v1/stores/{storeId}/members/{memberId}/leaves")
     public ResponseEntity<ApiResponse<LeaveUsageResponse>> useLeave(@PathVariable Long storeId,
             @PathVariable Long memberId, @CurrentUserId Long userId,
             @Valid @RequestBody UseLeaveRequest request) {
@@ -37,7 +37,7 @@ public class LeaveController {
                 .body(ApiResponse.success(leaveService.useLeave(storeId, memberId, userId, request)));
     }
 
-    @DeleteMapping("/api/stores/{storeId}/leaves/{leaveId}")
+    @DeleteMapping("/api/v1/stores/{storeId}/leaves/{leaveId}")
     public ApiResponse<Void> cancelLeave(@PathVariable Long storeId, @PathVariable Long leaveId,
             @CurrentUserId Long userId) {
         leaveService.cancelLeave(storeId, leaveId, userId);

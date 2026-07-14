@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/stores/{storeId}/members")
+@RequestMapping("/api/v1/stores/{storeId}/members")
 @RequiredArgsConstructor
 public class StoreMemberController {
 

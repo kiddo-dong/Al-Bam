@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/stores/{storeId}/shifts")
+@RequestMapping("/api/v1/stores/{storeId}/shifts")
 @RequiredArgsConstructor
 public class ShiftController {
 

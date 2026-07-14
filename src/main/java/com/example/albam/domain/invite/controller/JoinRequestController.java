@@ -25,37 +25,37 @@ public class JoinRequestController {
 
     private final JoinRequestService joinRequestService;
 
-    @PostMapping("/api/join-requests")
+    @PostMapping("/api/v1/join-requests")
     public ResponseEntity<ApiResponse<JoinRequestResponse>> requestJoin(@CurrentUserId Long userId,
             @Valid @RequestBody JoinRequestByCodeRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(joinRequestService.requestJoin(userId, request.code())));
     }
 
-    @GetMapping("/api/join-requests/me")
+    @GetMapping("/api/v1/join-requests/me")
     public ApiResponse<List<JoinRequestResponse>> getMyRequests(@CurrentUserId Long userId) {
         return ApiResponse.success(joinRequestService.getMyRequests(userId));
     }
 
-    @DeleteMapping("/api/join-requests/{requestId}")
+    @DeleteMapping("/api/v1/join-requests/{requestId}")
     public ApiResponse<Void> cancelMyRequest(@PathVariable Long requestId, @CurrentUserId Long userId) {
         joinRequestService.cancelMyRequest(requestId, userId);
         return ApiResponse.ok();
     }
 
-    @GetMapping("/api/stores/{storeId}/join-requests")
+    @GetMapping("/api/v1/stores/{storeId}/join-requests")
     public ApiResponse<List<JoinRequestResponse>> getPendingRequests(@PathVariable Long storeId,
             @CurrentUserId Long userId) {
         return ApiResponse.success(joinRequestService.getPendingRequests(storeId, userId));
     }
 
-    @PostMapping("/api/stores/{storeId}/join-requests/{requestId}/approve")
+    @PostMapping("/api/v1/stores/{storeId}/join-requests/{requestId}/approve")
     public ApiResponse<JoinRequestResponse> approve(@PathVariable Long storeId, @PathVariable Long requestId,
             @CurrentUserId Long userId, @Valid @RequestBody ApproveJoinRequestRequest request) {
         return ApiResponse.success(joinRequestService.approve(storeId, requestId, userId, request));
     }
 
-    @PostMapping("/api/stores/{storeId}/join-requests/{requestId}/reject")
+    @PostMapping("/api/v1/stores/{storeId}/join-requests/{requestId}/reject")
     public ApiResponse<JoinRequestResponse> reject(@PathVariable Long storeId, @PathVariable Long requestId,
             @CurrentUserId Long userId) {
         return ApiResponse.success(joinRequestService.reject(storeId, requestId, userId));
