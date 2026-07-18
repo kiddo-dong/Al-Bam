@@ -15,7 +15,6 @@ import com.example.albam.domain.home.dto.HomeResponse;
 import com.example.albam.domain.home.dto.HomeResponse.ChecklistProgress;
 import com.example.albam.domain.home.dto.HomeResponse.ManagerSection;
 import com.example.albam.domain.home.dto.HomeResponse.MyDaySection;
-import com.example.albam.domain.home.dto.HomeResponse.OwnerSection;
 import com.example.albam.domain.home.dto.HomeResponse.TodayOrderItem;
 import com.example.albam.domain.home.dto.HomeResponse.TodayRosterEntry;
 import com.example.albam.domain.invite.entity.JoinRequestStatus;
@@ -29,7 +28,6 @@ import com.example.albam.domain.shift.dto.ShiftResponse;
 import com.example.albam.domain.shift.entity.Shift;
 import com.example.albam.domain.shift.entity.ShiftStatus;
 import com.example.albam.domain.shift.repository.ShiftRepository;
-import com.example.albam.domain.storemember.entity.MemberRole;
 import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.domain.supplier.entity.Supplier;
@@ -78,10 +76,8 @@ public class HomeService {
         MyDaySection myDay = buildMyDay(storeId, userId, me, today);
         ManagerSection managerSection = me.isOwnerOrManager()
                 ? buildManagerSection(storeId, userId, today) : null;
-        OwnerSection ownerSection = me.getRole() == MemberRole.OWNER
-                ? buildOwnerSection(storeId, userId, today) : null;
 
-        return new HomeResponse(me.getRole(), me.getId(), myDay, managerSection, ownerSection);
+        return new HomeResponse(me.getRole(), me.getId(), myDay, managerSection);
     }
 
     private MyDaySection buildMyDay(Long storeId, Long userId, StoreMember me, LocalDate today) {
@@ -167,15 +163,13 @@ public class HomeService {
                             item.getSpec(), item.getWeeklyQuantities().get(todayDow))));
         }
 
-        return new ManagerSection(roster, orderItems);
-    }
-
-    private OwnerSection buildOwnerSection(Long storeId, Long userId, LocalDate today) {
         YearMonth thisMonth = YearMonth.from(today);
         DashboardResponse dashboard = storeDashboardService.getDashboard(storeId, userId,
                 thisMonth.getYear(), thisMonth.getMonthValue());
         long pendingJoinRequests = joinRequestRepository.countByStoreIdAndStatus(storeId,
                 JoinRequestStatus.PENDING);
-        return new OwnerSection(dashboard.totalLaborCost(), dashboard.totalNetPay(), pendingJoinRequests);
+
+        return new ManagerSection(roster, orderItems, dashboard.totalLaborCost(), dashboard.totalNetPay(),
+                pendingJoinRequests);
     }
 }

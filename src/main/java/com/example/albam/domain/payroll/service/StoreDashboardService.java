@@ -46,8 +46,7 @@ public class StoreDashboardService {
         if (month < 1 || month > 12) {
             throw new InvalidRequestException("월은 1~12 사이여야 합니다.");
         }
-        // 인건비(시급·급여)는 민감정보 정책상 OWNER 전용 (멤버 상세목록과 동일 기준)
-        storeAuthorizationService.requireOwner(storeId, userId);
+        storeAuthorizationService.requireOwnerOrManager(storeId, userId);
 
         YearMonth yearMonth = YearMonth.of(year, month);
         LocalDate monthStart = yearMonth.atDay(1);

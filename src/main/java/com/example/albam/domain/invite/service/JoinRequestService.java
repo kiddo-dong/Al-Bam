@@ -74,7 +74,7 @@ public class JoinRequestService {
     }
 
     public List<JoinRequestResponse> getPendingRequests(Long storeId, Long userId) {
-        storeAuthorizationService.requireOwner(storeId, userId);
+        storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         return joinRequestRepository
                 .findAllByStoreIdAndStatusOrderByRequestedAtAsc(storeId, JoinRequestStatus.PENDING).stream()
                 .map(JoinRequestResponse::from)
@@ -84,7 +84,7 @@ public class JoinRequestService {
     @Transactional
     public JoinRequestResponse approve(Long storeId, Long requestId, Long userId,
             ApproveJoinRequestRequest request) {
-        storeAuthorizationService.requireOwner(storeId, userId);
+        storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         if (request.role() == MemberRole.OWNER) {
             throw new InvalidRequestException("OWNER 역할로는 승인할 수 없습니다.");
         }
@@ -108,7 +108,7 @@ public class JoinRequestService {
 
     @Transactional
     public JoinRequestResponse reject(Long storeId, Long requestId, Long userId) {
-        storeAuthorizationService.requireOwner(storeId, userId);
+        storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         JoinRequest joinRequest = getJoinRequest(storeId, requestId);
         joinRequest.reject();
         return JoinRequestResponse.from(joinRequest);

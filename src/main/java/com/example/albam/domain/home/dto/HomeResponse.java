@@ -9,15 +9,13 @@ import java.time.LocalTime;
 import java.util.List;
 
 /**
- * 매장 홈 화면. myDay는 모든 역할 공통이고, managerSection은 OWNER/MANAGER,
- * ownerSection은 OWNER일 때만 채워진다 (아니면 null).
+ * 매장 홈 화면. myDay는 모든 역할 공통이고, managerSection은 OWNER/MANAGER일 때만 채워진다 (아니면 null).
  */
 public record HomeResponse(
         MemberRole myRole,
         Long myStoreMemberId,
         MyDaySection myDay,
-        ManagerSection managerSection,
-        OwnerSection ownerSection
+        ManagerSection managerSection
 ) {
     /** 오늘 나의 하루 (전 역할 공통). */
     public record MyDaySection(
@@ -35,10 +33,13 @@ public record HomeResponse(
     public record ChecklistProgress(int done, int total) {
     }
 
-    /** 오늘 매장 운영 현황 (OWNER/MANAGER). */
+    /** 오늘 매장 운영 현황 + 인건비·처리할 일 (OWNER/MANAGER). */
     public record ManagerSection(
             List<TodayRosterEntry> todayRoster,
-            List<TodayOrderItem> todayOrderItems
+            List<TodayOrderItem> todayOrderItems,
+            long monthLaborCost,
+            long monthNetPay,
+            long pendingJoinRequestCount
     ) {
     }
 
@@ -64,11 +65,4 @@ public record HomeResponse(
     ) {
     }
 
-    /** 인건비·처리할 일 (OWNER 전용). */
-    public record OwnerSection(
-            long monthLaborCost,
-            long monthNetPay,
-            long pendingJoinRequestCount
-    ) {
-    }
 }
