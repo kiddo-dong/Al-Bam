@@ -25,9 +25,9 @@ public class StoreMemberService {
     private final StoreMemberRepository storeMemberRepository;
     private final StoreAuthorizationService storeAuthorizationService;
 
-    /** 멤버 전체 상세 목록 (시급·이메일·공제방식 등 민감정보 포함) — OWNER 전용. */
+    /** 멤버 전체 상세 목록 (시급·이메일·공제방식 등 민감정보 포함) — OWNER/MANAGER. */
     public List<StoreMemberResponse> getMembers(Long storeId, Long userId) {
-        storeAuthorizationService.requireOwner(storeId, userId);
+        storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         return storeMemberRepository.findAllByStoreId(storeId).stream()
                 .map(StoreMemberResponse::from)
                 .toList();

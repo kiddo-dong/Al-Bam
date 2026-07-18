@@ -25,7 +25,7 @@ public class StoreMemberController {
 
     private final StoreMemberService storeMemberService;
 
-    /** 전체 상세 목록 (민감정보 포함) — OWNER 전용. */
+    /** 전체 상세 목록 (민감정보 포함) — OWNER/MANAGER. */
     @GetMapping
     public ApiResponse<List<StoreMemberResponse>> getMembers(@PathVariable Long storeId,
             @CurrentUserId Long userId) {
