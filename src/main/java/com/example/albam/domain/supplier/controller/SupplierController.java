@@ -1,5 +1,7 @@
 package com.example.albam.domain.supplier.controller;
 
+import com.example.albam.domain.supplier.dto.SupplierItemRequest;
+import com.example.albam.domain.supplier.dto.SupplierItemResponse;
 import com.example.albam.domain.supplier.dto.SupplierRequest;
 import com.example.albam.domain.supplier.dto.SupplierResponse;
 import com.example.albam.domain.supplier.service.SupplierService;
@@ -52,6 +54,29 @@ public class SupplierController {
     public ApiResponse<Void> deleteSupplier(@PathVariable Long storeId, @PathVariable Long supplierId,
             @CurrentUserId Long userId) {
         supplierService.deleteSupplier(storeId, supplierId, userId);
+        return ApiResponse.ok();
+    }
+
+    /** 발주 품목 등록 (OWNER/MANAGER). 요일별 발주량은 자유 텍스트. */
+    @PostMapping("/{supplierId}/items")
+    public ResponseEntity<ApiResponse<SupplierItemResponse>> addItem(@PathVariable Long storeId,
+            @PathVariable Long supplierId, @CurrentUserId Long userId,
+            @Valid @RequestBody SupplierItemRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(supplierService.addItem(storeId, supplierId, userId, request)));
+    }
+
+    @PatchMapping("/items/{itemId}")
+    public ApiResponse<SupplierItemResponse> updateItem(@PathVariable Long storeId,
+            @PathVariable Long itemId, @CurrentUserId Long userId,
+            @Valid @RequestBody SupplierItemRequest request) {
+        return ApiResponse.success(supplierService.updateItem(storeId, itemId, userId, request));
+    }
+
+    @DeleteMapping("/items/{itemId}")
+    public ApiResponse<Void> deleteItem(@PathVariable Long storeId, @PathVariable Long itemId,
+            @CurrentUserId Long userId) {
+        supplierService.deleteItem(storeId, itemId, userId);
         return ApiResponse.ok();
     }
 }
