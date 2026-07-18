@@ -6,8 +6,12 @@ import com.example.albam.domain.attendance.entity.Attendance;
 import com.example.albam.domain.attendance.entity.AttendanceStatus;
 import com.example.albam.domain.attendance.repository.AttendanceRepository;
 import com.example.albam.domain.attendance.service.AttendanceReportService;
+import com.example.albam.domain.payroll.dto.DailyDashboardResponse;
+import com.example.albam.domain.payroll.dto.DailyDashboardResponse.DailyMemberRow;
 import com.example.albam.domain.payroll.dto.DashboardResponse;
 import com.example.albam.domain.payroll.dto.DashboardResponse.MemberCostRow;
+import com.example.albam.domain.payroll.dto.WeeklyDashboardResponse;
+import com.example.albam.domain.payroll.dto.WeeklyDashboardResponse.WeeklyMemberRow;
 import com.example.albam.domain.payroll.service.PayrollCalculator.PayrollResult;
 import com.example.albam.domain.shift.entity.Shift;
 import com.example.albam.domain.shift.entity.ShiftStatus;
@@ -17,19 +21,25 @@ import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.InvalidRequestException;
+import com.example.albam.global.labor.LaborStandards;
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 사장님용 월간 대시보드 집계. 멤버별로 급여 엔진을 돌려 인건비를 합산한다. */
+/** 대시보드 집계. 월간(인건비 포함)·일간·주간(시간/준수 중심)을 담당한다. */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -104,5 +114,102 @@ public class StoreDashboardService {
 
         return new DashboardResponse(year, month, activeMemberCount, totalWorkMinutes, totalLaborCost,
                 totalDeduction, totalLaborCost - totalDeduction, attendanceSummary, rows);
+    }
+
+    /** 일일 대시보드: 그날의 근무·근태 요약 (금액 없음). */
+    public DailyDashboardResponse getDailyDashboard(Long storeId, Long userId, LocalDate date) {
+        storeAuthorizationService.requireOwnerOrManager(storeId, userId);
+        List<AttendanceReportEntry> report =
+                attendanceReportService.getReport(storeId, userId, null, date, date);
+        Map<Long, Attendance> attendanceById = attendanceRepository
+                .findAllByStoreMemberStoreIdAndWorkDateBetweenOrderByWorkDateDesc(storeId, date, date)
+                .stream()
+                .collect(Collectors.toMap(Attendance::getId, Function.identity()));
+
+        List<DailyMemberRow> rows = report.stream()
+                .map(entry -> {
+                    Attendance attendance = entry.attendanceId() == null ? null
+                            : attendanceById.get(entry.attendanceId());
+                    return new DailyMemberRow(entry.storeMemberId(), entry.userName(), entry.clockInAt(),
+                            entry.clockOutAt(), attendance == null ? null : attendance.getBreakMinutes(),
+                            attendance == null ? 0 : workMinutesOf(attendance), entry.status(),
+                            entry.lateMinutes(), entry.earlyLeaveMinutes());
+                })
+                .toList();
+
+        long totalWorkMinutes = rows.stream().mapToLong(DailyMemberRow::workMinutes).sum();
+        int workedMemberCount = (int) report.stream()
+                .filter(entry -> entry.attendanceId() != null)
+                .map(AttendanceReportEntry::storeMemberId)
+                .distinct()
+                .count();
+        Map<WorkComplianceStatus, Long> complianceSummary = report.stream()
+                .collect(Collectors.groupingBy(AttendanceReportEntry::status, Collectors.counting()));
+
+        return new DailyDashboardResponse(date, totalWorkMinutes, workedMemberCount, complianceSummary, rows);
+    }
+
+    /** 주간 대시보드: 주 52시간(연소자 35시간) 상한·주휴 15시간 모니터링 (금액 없음). */
+    public WeeklyDashboardResponse getWeeklyDashboard(Long storeId, Long userId, LocalDate date) {
+        storeAuthorizationService.requireOwnerOrManager(storeId, userId);
+        LocalDate weekStart = date.with(DayOfWeek.MONDAY);
+        LocalDate weekEnd = weekStart.plusDays(6);
+        LocalDate today = LocalDate.now();
+
+        // 실근무: 이번 주의 근태 (근무 중이면 현재까지 누적)
+        Map<Long, Long> actualByMemberId = new HashMap<>();
+        for (Attendance attendance : attendanceRepository
+                .findAllByStoreMemberStoreIdAndWorkDateBetweenOrderByWorkDateDesc(storeId, weekStart, weekEnd)) {
+            actualByMemberId.merge(attendance.getStoreMember().getId(), workMinutesOf(attendance), Long::sum);
+        }
+        // 남은 스케줄: 오늘 이후의 비취소 스케줄
+        Map<Long, Long> remainingByMemberId = new HashMap<>();
+        for (Shift shift : shiftRepository
+                .findAllByStoreMemberStoreIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(
+                        storeId, weekStart, weekEnd)) {
+            if (shift.getStatus() != ShiftStatus.CANCELED && shift.getWorkDate().isAfter(today)) {
+                remainingByMemberId.merge(shift.getStoreMember().getId(), shift.workMinutes(), Long::sum);
+            }
+        }
+
+        List<WeeklyMemberRow> rows = new ArrayList<>();
+        for (StoreMember member : storeMemberRepository.findAllByStoreId(storeId)) {
+            long actual = actualByMemberId.getOrDefault(member.getId(), 0L);
+            long remaining = remainingByMemberId.getOrDefault(member.getId(), 0L);
+            if (member.getStatus() != MemberStatus.ACTIVE && actual == 0 && remaining == 0) {
+                continue;
+            }
+            long projected = actual + remaining;
+            boolean minor = LaborStandards.isMinor(member.getUser().getBirthDate(), weekEnd);
+            Long capMinutes;
+            if (minor) {
+                capMinutes = (long) LaborStandards.MINOR_MAX_WEEKLY_WORK_MINUTES;
+            } else if (member.getStore().isSmallBusiness()) {
+                capMinutes = null;
+            } else {
+                capMinutes = (long) LaborStandards.MAX_WEEKLY_WORK_MINUTES;
+            }
+            rows.add(new WeeklyMemberRow(member.getId(), member.getUser().getName(), actual, remaining,
+                    projected, capMinutes, capMinutes != null && projected > capMinutes,
+                    projected >= LaborStandards.WEEKLY_HOLIDAY_ELIGIBLE_MINUTES));
+        }
+        rows.sort(Comparator.comparingLong(WeeklyMemberRow::projectedMinutes).reversed());
+
+        Map<WorkComplianceStatus, Long> complianceSummary = attendanceReportService
+                .getReport(storeId, userId, null, weekStart, weekEnd).stream()
+                .collect(Collectors.groupingBy(AttendanceReportEntry::status, Collectors.counting()));
+
+        long totalActual = rows.stream().mapToLong(WeeklyMemberRow::actualMinutes).sum();
+        long totalProjected = rows.stream().mapToLong(WeeklyMemberRow::projectedMinutes).sum();
+        return new WeeklyDashboardResponse(weekStart, weekEnd, totalActual, totalProjected,
+                complianceSummary, rows);
+    }
+
+    /** 실근무시간(분). 퇴근 전이면 현재 시각까지 누적으로 계산한다. */
+    private long workMinutesOf(Attendance attendance) {
+        LocalDateTime end = attendance.getClockOutAt() == null ? LocalDateTime.now()
+                : attendance.getClockOutAt();
+        return Math.max(0,
+                Duration.between(attendance.getClockInAt(), end).toMinutes() - attendance.getBreakMinutes());
     }
 }

@@ -25,6 +25,9 @@ public final class LaborStandards {
     /** 연소근로자(18세 미만)의 1주 최대 근로시간 (분). */
     public static final int MINOR_MAX_WEEKLY_WORK_MINUTES = 35 * 60;
 
+    /** 주휴수당 발생 기준 주간 근로시간 (분). */
+    public static final int WEEKLY_HOLIDAY_ELIGIBLE_MINUTES = 15 * 60;
+
     /** 사업소득 원천징수율 (소득세 3% + 지방소득세 0.3%). */
     public static final double WITHHOLDING_TAX_RATE = 0.033;
 
