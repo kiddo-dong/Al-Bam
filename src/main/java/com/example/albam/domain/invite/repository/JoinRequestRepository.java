@@ -16,5 +16,7 @@ public interface JoinRequestRepository extends JpaRepository<JoinRequest, Long> 
 
     List<JoinRequest> findAllByUserIdOrderByRequestedAtDesc(Long userId);
 
+    long countByStoreIdAndStatus(Long storeId, JoinRequestStatus status);
+
     void deleteByUserId(Long userId);
 }
