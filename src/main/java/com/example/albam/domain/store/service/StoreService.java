@@ -1,11 +1,6 @@
 package com.example.albam.domain.store.service;
 
-import com.example.albam.domain.store.dto.BusinessHourRequest;
-import com.example.albam.domain.store.dto.CreateStoreRequest;
-import com.example.albam.domain.store.dto.InviteCodeResponse;
-import com.example.albam.domain.store.dto.MyStoreResponse;
-import com.example.albam.domain.store.dto.StoreResponse;
-import com.example.albam.domain.store.dto.UpdateStoreRequest;
+import com.example.albam.domain.store.dto.*;
 import com.example.albam.domain.store.entity.BusinessHour;
 import com.example.albam.domain.store.entity.Store;
 import com.example.albam.domain.store.repository.StoreRepository;
@@ -86,6 +81,33 @@ public class StoreService {
                 request.category(), toBusinessHours(request.businessHours()), request.breakPolicy(),
                 request.smallBusiness());
         return StoreResponse.from(store);
+    }
+
+    /**
+     * 매장 양도: 대상 멤버를 OWNER로 올리고 기존 오너는 MANAGER로 내린다 (매장당 OWNER 1명 유지).
+     * 기존 오너는 이후 원하면 스스로 매장을 나갈 수 있다. 실수 방지를 위해 매장 이름 확인이 필요하다.
+     */
+    @Transactional
+    public void transferOwnership(Long storeId, Long userId, TransferOwnershipRequest request) {
+        StoreMember owner = storeAuthorizationService.requireOwner(storeId, userId);
+        Store store = getStoreEntity(storeId);
+        if (!store.getName().equals(request.confirmName())) {
+            throw new InvalidRequestException(
+                    "매장 이름이 일치하지 않습니다. 이전하려면 매장 이름(" + store.getName() + ")을 정확히 입력해 주세요.");
+        }
+        StoreMember target = storeMemberRepository.findById(request.targetMemberId())
+                .orElseThrow(() -> new NotFoundException("멤버를 찾을 수 없습니다."));
+        if (!target.getStore().getId().equals(storeId)) {
+            throw new NotFoundException("멤버를 찾을 수 없습니다.");
+        }
+        if (target.getId().equals(owner.getId())) {
+            throw new InvalidRequestException("자기 자신에게는 소유권을 이전할 수 없습니다.");
+        }
+        if (target.getStatus() != MemberStatus.ACTIVE) {
+            throw new InvalidRequestException("퇴사 처리된 멤버에게는 소유권을 이전할 수 없습니다.");
+        }
+        target.changeRole(MemberRole.OWNER);
+        owner.changeRole(MemberRole.MANAGER);
     }
 
     /** 매장 삭제는 되돌릴 수 없으므로, 실수 방지를 위해 매장 이름을 정확히 입력해야 실행된다. */

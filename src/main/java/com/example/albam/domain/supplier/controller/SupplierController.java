@@ -36,7 +36,7 @@ public class SupplierController {
                 .body(ApiResponse.success(supplierService.createSupplier(storeId, userId, request)));
     }
 
-    /** 거래처 목록 (카테고리별 정렬) — 멤버 누구나. */
+    /** 거래처 목록 (카테고리별 정렬) — OWNER/MANAGER 전용. */
     @GetMapping
     public ApiResponse<List<SupplierResponse>> getSuppliers(@PathVariable Long storeId,
             @CurrentUserId Long userId) {

@@ -34,9 +34,9 @@ public class SupplierService {
         return SupplierResponse.from(supplier, List.of());
     }
 
-    /** 거래처 목록 + 각 거래처의 발주 품목(요일별 수량 포함) — 멤버 누구나. */
+    /** 거래처 목록 + 각 거래처의 발주 품목(요일별 수량 포함) — OWNER/MANAGER 전용. */
     public List<SupplierResponse> getSuppliers(Long storeId, Long userId) {
-        storeAuthorizationService.requireMember(storeId, userId);
+        storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         return supplierRepository.findAllByStoreIdOrderByCategoryAscDisplayOrderAscIdAsc(storeId).stream()
                 .map(supplier -> SupplierResponse.from(supplier, getItemResponses(supplier.getId())))
                 .toList();
