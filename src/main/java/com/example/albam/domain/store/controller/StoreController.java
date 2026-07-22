@@ -4,6 +4,7 @@ import com.example.albam.domain.store.dto.CreateStoreRequest;
 import com.example.albam.domain.store.dto.InviteCodeResponse;
 import com.example.albam.domain.store.dto.MyStoreResponse;
 import com.example.albam.domain.store.dto.StoreResponse;
+import com.example.albam.domain.store.dto.TransferOwnershipRequest;
 import com.example.albam.domain.store.dto.UpdateStoreRequest;
 import com.example.albam.domain.store.service.StoreService;
 import com.example.albam.global.common.ApiResponse;
@@ -70,5 +71,13 @@ public class StoreController {
     public ApiResponse<InviteCodeResponse> regenerateInviteCode(@PathVariable Long storeId,
             @CurrentUserId Long userId) {
         return ApiResponse.success(storeService.regenerateInviteCode(storeId, userId));
+    }
+
+    /** 소유권 이전: 다른 재직 멤버를 OWNER로 올리고 본인은 MANAGER로 내려간다 (OWNER 전용, 매장 이름 확인 필수). */
+    @PostMapping("/{storeId}/transfer-ownership")
+    public ApiResponse<Void> transferOwnership(@PathVariable Long storeId, @CurrentUserId Long userId,
+            @Valid @RequestBody TransferOwnershipRequest request) {
+        storeService.transferOwnership(storeId, userId, request);
+        return ApiResponse.ok();
     }
 }
