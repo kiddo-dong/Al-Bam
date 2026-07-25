@@ -77,6 +77,7 @@ STAFF 화면에 **추가로** 필요한 것들입니다.
 | 멤버 관리 | 전체 멤버 목록(시급·역할·상태 포함), 역할/시급/공제방식 수정, 퇴사 처리 | `GET/PATCH/DELETE /members` |
 | 가입 신청 승인 | 대기 목록 확인, 역할 지정 승인/거절 | `GET /join-requests`, `POST /.../approve`, `/reject` |
 | 스케줄 관리 | 스케줄 생성/수정/삭제, 반복 생성, 시프트 템플릿 관리 | `/shifts`, `/shifts/recurring`, `/shift-templates` |
+| AI 스케줄 초안 생성 | 기간+자유 텍스트 요구사항 입력 → AI가 초안 제안, **저장 전 반드시 사용자 확인 필요**(accepted/rejected 분리 응답) | `POST /shifts/ai-draft` (미리보기, 비저장) → `POST /shifts/ai-draft/confirm` (사용자가 확인/수정한 목록을 실제 저장) |
 | 근태 관리 | 매장 전체 근태 조회, 수동 등록/보정, 근태 리포트(지각·결근 자동판정) | `/attendance`, `/attendance/report` |
 | 연차 관리 | 멤버 연차 사용 등록/취소 | `POST/DELETE /members/{id}/leaves` |
 | 급여 대시보드 | 월간 인건비 합계, 멤버별 비용 | `GET /dashboard?year=&month=` |

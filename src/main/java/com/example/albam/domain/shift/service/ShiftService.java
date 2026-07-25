@@ -47,15 +47,32 @@ public class ShiftService {
     public ShiftResponse createShift(Long storeId, Long userId, CreateShiftRequest request) {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         StoreMember target = getStoreMemberInStore(storeId, request.storeMemberId());
-        int breakMinutes = resolveBreakMinutes(target.getStore(), request.startTime(), request.endTime(),
-                request.breakMinutes());
-        validateAvailability(target, request.workDate(), request.startTime(), request.endTime());
-        validateMinorProtection(target, request.workDate(), request.startTime(), request.endTime(), breakMinutes);
-        validateNoOverlap(target, request.workDate(), request.startTime(), request.endTime(), null);
-        validateWeeklyLimit(target, request.workDate(), request.startTime(), request.endTime(), breakMinutes, null);
+        int breakMinutes = validateAndResolveBreak(target, request.workDate(), request.startTime(),
+                request.endTime(), request.breakMinutes(), null);
         Shift shift = shiftRepository.save(
                 new Shift(target, request.workDate(), request.startTime(), request.endTime(), breakMinutes));
         return ShiftResponse.from(shift);
+    }
+
+    /**
+     * AI가 제안한 스케줄 초안이 유효한지 검증만 하고 저장하지 않는다. createShift와 동일한 규칙(근무가능요일·영업시간·
+     * 연소자보호·중복·주간상한)을 그대로 재사용하므로, AI 제안이 통과하면 실제 생성도 반드시 통과한다.
+     */
+    public int validateDraftShift(Long storeId, Long userId, Long storeMemberId, LocalDate workDate,
+            LocalTime startTime, LocalTime endTime) {
+        storeAuthorizationService.requireOwnerOrManager(storeId, userId);
+        StoreMember target = getStoreMemberInStore(storeId, storeMemberId);
+        return validateAndResolveBreak(target, workDate, startTime, endTime, null, null);
+    }
+
+    private int validateAndResolveBreak(StoreMember target, LocalDate workDate, LocalTime startTime,
+            LocalTime endTime, Integer requestedBreakMinutes, Long excludeShiftId) {
+        int breakMinutes = resolveBreakMinutes(target.getStore(), startTime, endTime, requestedBreakMinutes);
+        validateAvailability(target, workDate, startTime, endTime);
+        validateMinorProtection(target, workDate, startTime, endTime, breakMinutes);
+        validateNoOverlap(target, workDate, startTime, endTime, excludeShiftId);
+        validateWeeklyLimit(target, workDate, startTime, endTime, breakMinutes, excludeShiftId);
+        return breakMinutes;
     }
 
     @Transactional
@@ -80,10 +97,7 @@ public class ShiftService {
                 continue;
             }
             try {
-                validateAvailability(target, date, request.startTime(), request.endTime());
-                validateMinorProtection(target, date, request.startTime(), request.endTime(), breakMinutes);
-                validateNoOverlap(target, date, request.startTime(), request.endTime(), null);
-                validateWeeklyLimit(target, date, request.startTime(), request.endTime(), breakMinutes, null);
+                validateAndResolveBreak(target, date, request.startTime(), request.endTime(), breakMinutes, null);
                 Shift shift = shiftRepository.save(
                         new Shift(target, date, request.startTime(), request.endTime(), breakMinutes));
                 created.add(ShiftResponse.from(shift));
@@ -114,15 +128,14 @@ public class ShiftService {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         Shift shift = getShiftInStore(storeId, shiftId);
         StoreMember member = shift.getStoreMember();
-        int breakMinutes = resolveBreakMinutes(member.getStore(), request.startTime(), request.endTime(),
-                request.breakMinutes());
-        validateAvailability(member, request.workDate(), request.startTime(), request.endTime());
-        if (request.status() != ShiftStatus.CANCELED) {
-            validateMinorProtection(member, request.workDate(), request.startTime(), request.endTime(),
-                    breakMinutes);
-            validateNoOverlap(member, request.workDate(), request.startTime(), request.endTime(), shiftId);
-            validateWeeklyLimit(member, request.workDate(), request.startTime(), request.endTime(),
-                    breakMinutes, shiftId);
+        int breakMinutes;
+        if (request.status() == ShiftStatus.CANCELED) {
+            breakMinutes = resolveBreakMinutes(member.getStore(), request.startTime(), request.endTime(),
+                    request.breakMinutes());
+            validateAvailability(member, request.workDate(), request.startTime(), request.endTime());
+        } else {
+            breakMinutes = validateAndResolveBreak(member, request.workDate(), request.startTime(),
+                    request.endTime(), request.breakMinutes(), shiftId);
         }
         shift.update(request.workDate(), request.startTime(), request.endTime(), breakMinutes, request.status());
         return ShiftResponse.from(shift);
