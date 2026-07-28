@@ -60,6 +60,7 @@
 | 인수인계 노트 | 작성 + 열람 | `POST/GET /handover-notes` |
 | 매장 나가기 | 본인 탈퇴 | `DELETE /members/me` |
 | 가입 신청 (신규 매장) | 초대코드로 신청, 내 신청 조회/취소 | `POST /join-requests`, `GET/DELETE /join-requests/me` |
+| 근로기준법/세무 Q&A 챗봇 | 매장과 무관한 전역 기능, 자유 질문 → RAG 기반 답변 + 출처 표시 | `POST /labor-qa/ask` |
 
 > 💡 매뉴얼·공지·체크리스트·인수인계는 "보기"는 전 역할 공통이고, "작성/관리"만 관리자(OWNER/MANAGER) 전용입니다. 같은 화면에서 관리자에게만 편집 버튼을 노출하는 방식을 추천합니다.
 >
