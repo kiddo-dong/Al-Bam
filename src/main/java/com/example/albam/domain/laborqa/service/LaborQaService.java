@@ -49,8 +49,7 @@ public class LaborQaService {
         }
 
         String context = results.stream()
-                .map(document -> "[" + document.getMetadata().getOrDefault("title", "출처 미상") + "]\n"
-                        + document.getText())
+                .map(document -> "[" + resolveSourceLabel(document) + "]\n" + document.getText())
                 .collect(Collectors.joining("\n\n---\n\n"));
         String answer = chatClient.prompt()
                 .system(SYSTEM_PROMPT)
@@ -64,9 +63,24 @@ public class LaborQaService {
         }
 
         List<String> sources = results.stream()
-                .map(document -> String.valueOf(document.getMetadata().getOrDefault("title", "출처 미상")))
+                .map(this::resolveSourceLabel)
                 .distinct()
                 .toList();
         return new LaborQaResponse(answer + DISCLAIMER, sources, true);
+    }
+
+    /** 마크다운/JSON은 title 메타데이터를, PDF는 파일명+페이지 번호를 출처 표시로 쓴다. */
+    private String resolveSourceLabel(Document document) {
+        var metadata = document.getMetadata();
+        if (metadata.containsKey("title")) {
+            return String.valueOf(metadata.get("title"));
+        }
+        if (metadata.containsKey("file_name")) {
+            Object pageNumber = metadata.get("page_number");
+            return pageNumber != null
+                    ? metadata.get("file_name") + " (p." + pageNumber + ")"
+                    : String.valueOf(metadata.get("file_name"));
+        }
+        return "출처 미상";
     }
 }
