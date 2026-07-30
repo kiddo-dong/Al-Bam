@@ -22,7 +22,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class LaborQaSession extends BaseTimeEntity {
 
-    private static final int TITLE_MAX_LENGTH = 50;
+    private static final int TITLE_MAX_LENGTH = 30;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
