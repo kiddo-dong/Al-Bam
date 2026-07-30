@@ -18,9 +18,13 @@
 **권한은 상위 포함 관계입니다.** `OWNER ⊇ MANAGER ⊇ STAFF` — OWNER가 할 수 있는 건 MANAGER도 대부분 할 수 있고, MANAGER가 할 수 있는 건 STAFF는 못 합니다.
 
 ### 로그인 흐름
-1. `POST /api/v1/auth/login` (또는 `/auth/oauth/{google|kakao|naver}`) → `accessToken`, `refreshToken`, `profileCompleted` 받음
+1. `POST /api/v1/auth/login` (또는 `/auth/oauth/{google|kakao|naver}`) → 본문으로 `accessToken`, `profileCompleted` 받음. **리프레시 토큰은 본문에 없고 HttpOnly 쿠키(`refreshToken`)로 자동 저장됨** — JS로 읽을 수 없고 저장할 필요도 없음
 2. `profileCompleted`가 `false`면 → **추가정보 입력 화면**으로 보내기 (전화번호/생년월일/약관동의 누락 상태, 소셜 가입 직후 흔함)
 3. 이후 모든 API 요청에 `Authorization: Bearer {accessToken}` 헤더 필수
+4. 액세스 토큰 만료(401) 시 → `POST /api/v1/auth/refresh`를 **본문 없이** 호출 (쿠키가 자동 첨부됨) → 새 `accessToken` 수령. 이때 쿠키도 새 리프레시 토큰으로 자동 교체됨
+5. 로그아웃은 `POST /api/v1/auth/logout` 호출 (서버가 쿠키 만료) + 클라이언트가 들고 있던 `accessToken` 폐기
+
+> ⚠️ **auth 요청에는 반드시 credentials 포함**: fetch는 `credentials: 'include'`, axios는 `withCredentials: true`를 설정해야 쿠키가 오갑니다. 백엔드 CORS는 `http://localhost:5173` 오리진을 허용하도록 설정되어 있습니다 (배포 시 도메인 추가 필요).
 
 ### "지금 이 매장에서 내 역할이 뭔지" 알아내는 법
 - `GET /api/v1/stores` (내가 속한 매장 목록) 응답의 각 항목에 `myRole` 필드가 있습니다. 매장을 선택해 들어갈 때 이 값으로 화면을 분기하세요.

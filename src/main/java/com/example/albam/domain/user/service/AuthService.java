@@ -3,7 +3,7 @@ package com.example.albam.domain.user.service;
 import com.example.albam.domain.user.dto.LoginRequest;
 import com.example.albam.domain.user.dto.PasswordResetConfirmRequest;
 import com.example.albam.domain.user.dto.SignupRequest;
-import com.example.albam.domain.user.dto.TokenResponse;
+import com.example.albam.domain.user.dto.IssuedTokens;
 import com.example.albam.domain.user.entity.AuthProvider;
 import com.example.albam.domain.user.entity.EmailToken;
 import com.example.albam.domain.user.entity.EmailTokenType;
@@ -140,7 +140,7 @@ public class AuthService {
         }
     }
 
-    public TokenResponse login(LoginRequest request) {
+    public IssuedTokens login(LoginRequest request) {
         // 비밀번호 오류와 동일한 401 응답을 내려 계정 존재 여부를 노출하지 않는다
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BadCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다."));
@@ -157,7 +157,7 @@ public class AuthService {
     }
 
     @Transactional
-    public TokenResponse oauthLogin(AuthProvider provider, String accessToken) {
+    public IssuedTokens oauthLogin(AuthProvider provider, String accessToken) {
         OAuthUserInfo userInfo = resolveFetcher(provider).fetch(accessToken);
         User user = userRepository.findByProviderAndProviderId(provider, userInfo.providerId())
                 .orElseGet(() -> registerOAuthUser(provider, userInfo));
@@ -178,7 +178,7 @@ public class AuthService {
                 .orElseThrow(() -> new InvalidRequestException("지원하지 않는 로그인 방식입니다."));
     }
 
-    public TokenResponse refresh(String refreshToken) {
+    public IssuedTokens refresh(String refreshToken) {
         if (!jwtTokenProvider.validateToken(refreshToken) || !jwtTokenProvider.isRefreshToken(refreshToken)) {
             throw new InvalidRequestException("유효하지 않은 리프레시 토큰입니다.");
         }
@@ -187,9 +187,9 @@ public class AuthService {
         return issueTokens(user);
     }
 
-    private TokenResponse issueTokens(User user) {
+    private IssuedTokens issueTokens(User user) {
         String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getEmail());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId(), user.getEmail());
-        return new TokenResponse(accessToken, refreshToken, user.isProfileCompleted());
+        return new IssuedTokens(accessToken, refreshToken, user.isProfileCompleted());
     }
 }
