@@ -1,6 +1,8 @@
 package com.example.albam.domain.user.service;
 
 import com.example.albam.domain.invite.repository.JoinRequestRepository;
+import com.example.albam.domain.laborqa.repository.LaborQaMessageRepository;
+import com.example.albam.domain.laborqa.repository.LaborQaSessionRepository;
 import com.example.albam.domain.storemember.entity.MemberStatus;
 import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.user.dto.CompleteProfileRequest;
@@ -28,6 +30,8 @@ public class UserService {
     private final StoreMemberRepository storeMemberRepository;
     private final EmailTokenRepository emailTokenRepository;
     private final JoinRequestRepository joinRequestRepository;
+    private final LaborQaSessionRepository laborQaSessionRepository;
+    private final LaborQaMessageRepository laborQaMessageRepository;
     private final S3Uploader s3Uploader;
 
     public UserResponse getMe(Long userId) {
@@ -74,6 +78,9 @@ public class UserService {
         s3Uploader.delete(user.getProfileImageUrl());
         emailTokenRepository.deleteByUserId(userId);
         joinRequestRepository.deleteByUserId(userId);
+        // 개인 질문 이력은 민감할 수 있어 탈퇴 시 함께 삭제한다 (메시지 -> 세션 순서, FK 제약)
+        laborQaMessageRepository.deleteBySessionUserId(userId);
+        laborQaSessionRepository.deleteAll(laborQaSessionRepository.findAllByUserId(userId));
         user.anonymizeForWithdrawal();
     }
 
