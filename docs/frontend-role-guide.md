@@ -90,6 +90,7 @@ STAFF 화면에 **추가로** 필요한 것들입니다.
 | **거래처/발주 관리** | 발주처 등록·조회, 품목별 요일 발주량 관리 — **STAFF 접근 불가** | `GET/POST/PATCH/DELETE /suppliers`, `/suppliers/{id}/items` |
 | 매뉴얼/공지/체크리스트/인수인계 **관리** | 작성·수정·삭제 (STAFF는 조회만) | 각 도메인 POST/PATCH/DELETE |
 | 메뉴 원가 계산기 | 재료 단가 등록, 메뉴별 레시피·원가율·이익 계산 | `/menu-ingredients`, `/menus` |
+| 엑셀 원가표 가져오기 | 쓰던 엑셀/CSV 업로드 → AI가 재료 목록 추출 → **미리보기에서 확인/수정 후 등록** (자동 저장 없음, accepted/rejected 분리 응답에 원본 행 표시 포함) | `POST /menu-import/ingredients/analyze` (multipart `file`) → `POST /menu-import/ingredients/confirm` |
 
 ---
 
