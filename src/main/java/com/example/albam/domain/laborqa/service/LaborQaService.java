@@ -9,6 +9,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 /**
@@ -35,10 +36,17 @@ public class LaborQaService {
             답변 마지막 줄에는 참고한 출처(문서 제목)를 나열하세요.
             """;
 
-    private final VectorStore vectorStore;
+    /**
+     * {@link VectorStore}를 생성자에서 직접 주입받지 않고 {@link ObjectProvider}로 감싸는 이유: pgvector
+     * 연결은 이 벡터스토어 빈이 실제로 처음 만들어질 때 이루어지는데, 생성자 주입이면 이 서비스가 만들어지는
+     * 시점에 즉시 그 연결을 시도하게 되어 AiConfig의 {@code @Lazy}가 무력화된다. {@link #ask}가 실제로
+     * 호출될 때만 {@code getObject()}로 지연 조회하도록 한다.
+     */
+    private final ObjectProvider<VectorStore> vectorStoreProvider;
     private final ChatClient chatClient;
 
     public LaborQaResponse ask(LaborQaRequest request) {
+        VectorStore vectorStore = vectorStoreProvider.getObject();
         List<Document> results = vectorStore.similaritySearch(SearchRequest.builder()
                 .query(request.question())
                 .topK(TOP_K)

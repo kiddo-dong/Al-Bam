@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @Configuration
@@ -26,8 +27,13 @@ public class AiConfig {
      * 이 DataSource는 JPA가 쓰는 기본 DataSource와 별개이며, Spring 빈으로 등록하지 않고 여기서만 직접
      * 만들어 쓰므로 JPA 자동설정과 충돌하지 않는다. 앱 기동 시 {@code initializeSchema(true)}로 pgvector
      * 확장·테이블을 자동 생성한다.
+     *
+     * <p>{@code @Lazy}인 이유: 이 빈은 생성 시점에 실제 JDBC 커넥션을 연다. pgvector용 Postgres가 아직
+     * 준비되지 않은 로컬 개발 환경에서도 앱 전체가 부팅 실패하지 않도록, 근로기준법 Q&A 기능이 실제로
+     * 처음 쓰일 때까지 연결 시도를 미룬다(그 전까지는 다른 기능이 정상 동작한다).
      */
     @Bean
+    @Lazy
     public VectorStore vectorStore(EmbeddingModel embeddingModel,
             @Value("${app.vector-store.datasource.url}") String url,
             @Value("${app.vector-store.datasource.username}") String username,
