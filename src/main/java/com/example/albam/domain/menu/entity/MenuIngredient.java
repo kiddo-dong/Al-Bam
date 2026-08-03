@@ -10,6 +10,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -20,7 +21,7 @@ import lombok.NoArgsConstructor;
 /** 메뉴 원가 계산용 재료 단가. 구매가와 구매 용량으로 단위당 단가를 계산한다 (로스율 반영). */
 @Getter
 @Entity
-@Table(name = "menu_ingredients")
+@Table(name = "menu_ingredients", indexes = @Index(name = "idx_menu_ingredients_store_id", columnList = "store_id"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class MenuIngredient extends BaseTimeEntity {
 

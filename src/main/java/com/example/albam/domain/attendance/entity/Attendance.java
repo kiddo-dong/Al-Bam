@@ -11,6 +11,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -22,7 +23,8 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "attendances")
+@Table(name = "attendances",
+        indexes = @Index(name = "idx_attendances_store_member_id_work_date", columnList = "store_member_id, work_date"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Attendance extends BaseTimeEntity {
 

@@ -16,7 +16,9 @@ import com.example.albam.global.exception.NotFoundException;
 import com.example.albam.global.file.S3Uploader;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -33,6 +35,7 @@ public class UserService {
     private final LaborQaSessionRepository laborQaSessionRepository;
     private final LaborQaMessageRepository laborQaMessageRepository;
     private final S3Uploader s3Uploader;
+    private final PlatformTransactionManager transactionManager;
 
     public UserResponse getMe(Long userId) {
         return UserResponse.from(getUser(userId));
@@ -69,37 +72,55 @@ public class UserService {
      * 탈퇴: 근무 이력(근태·급여)이 StoreMember를 통해 유저를 참조하므로 행을 지우지 않고
      * 개인정보를 익명화한다 (soft delete). 활동 중인 매장이 있으면 먼저 나가야 한다.
      */
-    @Transactional
+    /** S3 삭제는 트랜잭션 밖에서 한다 — 커밋 후에 지워도 되고, 커밋까지 커넥션을 붙잡을 이유가 없다. */
     public void withdraw(Long userId) {
         if (storeMemberRepository.existsByUserIdAndStatus(userId, MemberStatus.ACTIVE)) {
             throw new ConflictException("소속된 매장이 있으면 탈퇴할 수 없습니다. 매장을 먼저 나가거나 삭제해 주세요.");
         }
-        User user = getUser(userId);
-        s3Uploader.delete(user.getProfileImageUrl());
-        emailTokenRepository.deleteByUserId(userId);
-        joinRequestRepository.deleteByUserId(userId);
-        // 개인 질문 이력은 민감할 수 있어 탈퇴 시 함께 삭제한다 (메시지 -> 세션 순서, FK 제약)
-        laborQaMessageRepository.deleteBySessionUserId(userId);
-        laborQaSessionRepository.deleteAll(laborQaSessionRepository.findAllByUserId(userId));
-        user.anonymizeForWithdrawal();
+        String[] profileImageUrlHolder = new String[1];
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            User user = getUser(userId);
+            profileImageUrlHolder[0] = user.getProfileImageUrl();
+            emailTokenRepository.deleteByUserId(userId);
+            joinRequestRepository.deleteByUserId(userId);
+            // 개인 질문 이력은 민감할 수 있어 탈퇴 시 함께 삭제한다 (메시지 -> 세션 순서, FK 제약)
+            laborQaMessageRepository.deleteBySessionUserId(userId);
+            laborQaSessionRepository.deleteAll(laborQaSessionRepository.findAllByUserId(userId));
+            user.anonymizeForWithdrawal();
+        });
+        if (profileImageUrlHolder[0] != null) {
+            s3Uploader.delete(profileImageUrlHolder[0]);
+        }
     }
 
-    @Transactional
+    /** S3 업로드/삭제는 네트워크 호출이라 DB 트랜잭션 밖에서 수행한다. */
     public UserResponse updateProfileImage(Long userId, MultipartFile image) {
-        User user = getUser(userId);
-        String previousImageUrl = user.getProfileImageUrl();
         String uploadedUrl = s3Uploader.upload(image, PROFILE_IMAGE_DIRECTORY);
-        user.changeProfileImageUrl(uploadedUrl);
-        s3Uploader.delete(previousImageUrl);
-        return UserResponse.from(user);
+        String[] previousImageUrlHolder = new String[1];
+        UserResponse response = new TransactionTemplate(transactionManager).execute(status -> {
+            User user = getUser(userId);
+            previousImageUrlHolder[0] = user.getProfileImageUrl();
+            user.changeProfileImageUrl(uploadedUrl);
+            return UserResponse.from(user);
+        });
+        if (previousImageUrlHolder[0] != null) {
+            s3Uploader.delete(previousImageUrlHolder[0]);
+        }
+        return response;
     }
 
-    @Transactional
     public UserResponse deleteProfileImage(Long userId) {
-        User user = getUser(userId);
-        s3Uploader.delete(user.getProfileImageUrl());
-        user.changeProfileImageUrl(null);
-        return UserResponse.from(user);
+        String[] previousImageUrlHolder = new String[1];
+        UserResponse response = new TransactionTemplate(transactionManager).execute(status -> {
+            User user = getUser(userId);
+            previousImageUrlHolder[0] = user.getProfileImageUrl();
+            user.changeProfileImageUrl(null);
+            return UserResponse.from(user);
+        });
+        if (previousImageUrlHolder[0] != null) {
+            s3Uploader.delete(previousImageUrlHolder[0]);
+        }
+        return response;
     }
 
     private User getUser(Long userId) {

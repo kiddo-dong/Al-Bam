@@ -31,6 +31,7 @@ import com.example.albam.domain.shift.repository.ShiftRepository;
 import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.domain.supplier.entity.Supplier;
+import com.example.albam.domain.supplier.entity.SupplierItem;
 import com.example.albam.domain.supplier.repository.SupplierItemRepository;
 import com.example.albam.domain.supplier.repository.SupplierRepository;
 import java.time.DayOfWeek;
@@ -97,10 +98,9 @@ public class HomeService {
                 .estimateMyPayroll(storeId, userId, thisMonth.getYear(), thisMonth.getMonthValue())
                 .netPay();
 
-        long unreadNoticeCount = noticeRepository.findAllByStoreIdOrderByCreatedAtDesc(storeId).stream()
-                .filter(notice -> !noticeReadRepository.existsByNoticeIdAndStoreMemberId(notice.getId(),
-                        me.getId()))
-                .count();
+        List<Long> noticeIds = noticeRepository.findIdsByStoreId(storeId);
+        long unreadNoticeCount = noticeIds.isEmpty() ? 0
+                : noticeIds.size() - noticeReadRepository.countByStoreMemberIdAndNoticeIdIn(me.getId(), noticeIds);
 
         List<ChecklistItem> items =
                 checklistItemRepository.findAllByStoreIdOrderByTypeAscDisplayOrderAscIdAsc(storeId);
@@ -154,13 +154,21 @@ public class HomeService {
         }
 
         DayOfWeek todayDow = today.getDayOfWeek();
+        List<Supplier> suppliers = supplierRepository
+                .findAllByStoreIdOrderByCategoryAscDisplayOrderAscIdAsc(storeId);
+        List<Long> supplierIds = suppliers.stream().map(Supplier::getId).toList();
+        Map<Long, List<SupplierItem>> itemsBySupplierId = supplierIds.isEmpty() ? Map.of()
+                : supplierItemRepository.findAllBySupplierIdInOrderByDisplayOrderAscIdAsc(supplierIds).stream()
+                        .collect(Collectors.groupingBy(item -> item.getSupplier().getId()));
+
         List<TodayOrderItem> orderItems = new ArrayList<>();
-        for (Supplier supplier : supplierRepository
-                .findAllByStoreIdOrderByCategoryAscDisplayOrderAscIdAsc(storeId)) {
-            supplierItemRepository.findAllBySupplierIdOrderByDisplayOrderAscIdAsc(supplier.getId()).stream()
-                    .filter(item -> item.getWeeklyQuantities().containsKey(todayDow))
-                    .forEach(item -> orderItems.add(new TodayOrderItem(supplier.getName(), item.getName(),
-                            item.getSpec(), item.getWeeklyQuantities().get(todayDow))));
+        for (Supplier supplier : suppliers) {
+            for (SupplierItem item : itemsBySupplierId.getOrDefault(supplier.getId(), List.of())) {
+                if (item.getWeeklyQuantities().containsKey(todayDow)) {
+                    orderItems.add(new TodayOrderItem(supplier.getName(), item.getName(), item.getSpec(),
+                            item.getWeeklyQuantities().get(todayDow)));
+                }
+            }
         }
 
         YearMonth thisMonth = YearMonth.from(today);

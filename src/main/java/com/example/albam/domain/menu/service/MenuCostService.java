@@ -10,6 +10,7 @@ import com.example.albam.domain.menu.entity.StoreMenu;
 import com.example.albam.domain.menu.repository.MenuIngredientRepository;
 import com.example.albam.domain.menu.repository.MenuRecipeItemRepository;
 import com.example.albam.domain.menu.repository.StoreMenuRepository;
+import com.example.albam.domain.store.entity.Store;
 import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.NotFoundException;
@@ -33,7 +34,13 @@ public class MenuCostService {
     public MenuIngredientResponse createIngredient(Long storeId, Long userId,
             MenuIngredientRequest request) {
         StoreMember manager = storeAuthorizationService.requireOwnerOrManager(storeId, userId);
-        MenuIngredient ingredient = menuIngredientRepository.save(new MenuIngredient(manager.getStore(),
+        return createIngredientFor(manager.getStore(), request);
+    }
+
+    /** 매장 소유권 확인이 이미 끝난 배치 등록용(엑셀 임포트 등) — 항목마다 권한 재조회하지 않는다. */
+    @Transactional
+    public MenuIngredientResponse createIngredientFor(Store store, MenuIngredientRequest request) {
+        MenuIngredient ingredient = menuIngredientRepository.save(new MenuIngredient(store,
                 request.name(), request.productInfo(), request.price(), request.packageQty(),
                 request.unit(), request.lossRate(), request.category()));
         return MenuIngredientResponse.from(ingredient);

@@ -67,11 +67,22 @@ public class ShiftService {
 
     private int validateAndResolveBreak(StoreMember target, LocalDate workDate, LocalTime startTime,
             LocalTime endTime, Integer requestedBreakMinutes, Long excludeShiftId) {
+        return validateAndResolveBreak(target, workDate, startTime, endTime, requestedBreakMinutes,
+                excludeShiftId, null);
+    }
+
+    /**
+     * memberShiftsCache가 주어지면 겹침·주간상한 검증에 DB 조회 대신 이 메모리 목록을 사용한다.
+     * 반복 생성 시 매 회 DB를 왕복하지 않기 위함 — 호출자가 새로 생성한 스케줄을 계속 추가해줘야 한다.
+     */
+    private int validateAndResolveBreak(StoreMember target, LocalDate workDate, LocalTime startTime,
+            LocalTime endTime, Integer requestedBreakMinutes, Long excludeShiftId,
+            List<Shift> memberShiftsCache) {
         int breakMinutes = resolveBreakMinutes(target.getStore(), startTime, endTime, requestedBreakMinutes);
         validateAvailability(target, workDate, startTime, endTime);
         validateMinorProtection(target, workDate, startTime, endTime, breakMinutes);
-        validateNoOverlap(target, workDate, startTime, endTime, excludeShiftId);
-        validateWeeklyLimit(target, workDate, startTime, endTime, breakMinutes, excludeShiftId);
+        validateNoOverlap(target, workDate, startTime, endTime, excludeShiftId, memberShiftsCache);
+        validateWeeklyLimit(target, workDate, startTime, endTime, breakMinutes, excludeShiftId, memberShiftsCache);
         return breakMinutes;
     }
 
@@ -92,14 +103,19 @@ public class ShiftService {
                 request.breakMinutes());
         List<ShiftResponse> created = new ArrayList<>();
         List<SkippedShiftDate> skipped = new ArrayList<>();
+        List<Shift> memberShiftsCache = new ArrayList<>(shiftRepository
+                .findAllByStoreMemberIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(
+                        target.getId(), request.periodStart().minusDays(1), request.periodEnd().plusDays(1)));
         for (LocalDate date = request.periodStart(); !date.isAfter(request.periodEnd()); date = date.plusDays(1)) {
             if (!request.daysOfWeek().contains(date.getDayOfWeek())) {
                 continue;
             }
             try {
-                validateAndResolveBreak(target, date, request.startTime(), request.endTime(), breakMinutes, null);
+                validateAndResolveBreak(target, date, request.startTime(), request.endTime(), breakMinutes, null,
+                        memberShiftsCache);
                 Shift shift = shiftRepository.save(
                         new Shift(target, date, request.startTime(), request.endTime(), breakMinutes));
+                memberShiftsCache.add(shift);
                 created.add(ShiftResponse.from(shift));
             } catch (InvalidRequestException e) {
                 skipped.add(new SkippedShiftDate(date, e.getMessage()));
@@ -194,7 +210,7 @@ public class ShiftService {
      * 연소근로자는 주 35시간, 성인은 주 52시간이며, 5인 미만 사업장의 성인은 상한이 적용되지 않는다.
      */
     private void validateWeeklyLimit(StoreMember member, LocalDate workDate, LocalTime startTime,
-            LocalTime endTime, int breakMinutes, Long excludeShiftId) {
+            LocalTime endTime, int breakMinutes, Long excludeShiftId, List<Shift> memberShiftsCache) {
         boolean minor = LaborStandards.isMinor(member.getUser().getBirthDate(), workDate);
         if (!minor && member.getStore().isSmallBusiness()) {
             return;
@@ -204,9 +220,11 @@ public class ShiftService {
         LocalDate weekStart = workDate.with(DayOfWeek.MONDAY);
         LocalDate weekEnd = weekStart.plusDays(6);
         long weeklyMinutes = spanMinutes(startTime, endTime) - breakMinutes;
-        for (Shift existing : shiftRepository
-                .findAllByStoreMemberIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(
-                        member.getId(), weekStart, weekEnd)) {
+        List<Shift> candidates = memberShiftsCache != null
+                ? filterByDateRange(memberShiftsCache, weekStart, weekEnd)
+                : shiftRepository.findAllByStoreMemberIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(
+                        member.getId(), weekStart, weekEnd);
+        for (Shift existing : candidates) {
             if (existing.getId().equals(excludeShiftId) || existing.getStatus() == ShiftStatus.CANCELED) {
                 continue;
             }
@@ -251,13 +269,14 @@ public class ShiftService {
      * 취소된 스케줄과 자기 자신(수정 시)은 비교 대상에서 제외한다.
      */
     private void validateNoOverlap(StoreMember member, LocalDate workDate, LocalTime startTime,
-            LocalTime endTime, Long excludeShiftId) {
+            LocalTime endTime, Long excludeShiftId, List<Shift> memberShiftsCache) {
         LocalDateTime newStart = workDate.atTime(startTime);
         LocalDate newEndDate = endTime.isBefore(startTime) ? workDate.plusDays(1) : workDate;
         LocalDateTime newEnd = newEndDate.atTime(endTime);
 
-        List<Shift> candidates = shiftRepository
-                .findAllByStoreMemberIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(
+        List<Shift> candidates = memberShiftsCache != null
+                ? filterByDateRange(memberShiftsCache, workDate.minusDays(1), workDate.plusDays(1))
+                : shiftRepository.findAllByStoreMemberIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(
                         member.getId(), workDate.minusDays(1), workDate.plusDays(1));
         for (Shift existing : candidates) {
             if (existing.getId().equals(excludeShiftId) || existing.getStatus() == ShiftStatus.CANCELED) {
@@ -269,6 +288,12 @@ public class ShiftService {
                                 + existing.getStartTime() + "~" + existing.getEndTime());
             }
         }
+    }
+
+    private List<Shift> filterByDateRange(List<Shift> shifts, LocalDate from, LocalDate to) {
+        return shifts.stream()
+                .filter(shift -> !shift.getWorkDate().isBefore(from) && !shift.getWorkDate().isAfter(to))
+                .toList();
     }
 
     private void validateStoreBusinessHours(Store store, DayOfWeek dayOfWeek, LocalTime startTime,

@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -73,12 +74,17 @@ public class AttendanceReportService {
         LocalDateTime now = LocalDateTime.now();
         Set<Long> matchedAttendanceIds = new HashSet<>();
         List<AttendanceReportEntry> entries = new ArrayList<>();
+        Map<String, List<Attendance>> attendancesByMemberAndDate = attendances.stream()
+                .collect(Collectors.groupingBy(
+                        attendance -> dayKey(attendance.getStoreMember().getId(), attendance.getWorkDate())));
 
         for (Shift shift : shifts) {
             if (shift.getStatus() == ShiftStatus.CANCELED || shift.startDateTime().isAfter(now)) {
                 continue;
             }
-            Attendance matched = findBestMatch(shift, attendances, matchedAttendanceIds, now);
+            List<Attendance> sameDayAttendances = attendancesByMemberAndDate.getOrDefault(
+                    dayKey(shift.getStoreMember().getId(), shift.getWorkDate()), List.of());
+            Attendance matched = findBestMatch(shift, sameDayAttendances, matchedAttendanceIds, now);
             if (matched == null) {
                 boolean onLeave = leaveKeys.contains(
                         dayKey(shift.getStoreMember().getId(), shift.getWorkDate()));

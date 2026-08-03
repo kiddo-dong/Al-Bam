@@ -9,6 +9,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -20,7 +21,8 @@ import lombok.NoArgsConstructor;
 /** 교대 인수인계 노트 ("우유 떨어짐, 6시 예약 있음"). 멤버 누구나 작성한다. */
 @Getter
 @Entity
-@Table(name = "handover_notes")
+@Table(name = "handover_notes",
+        indexes = @Index(name = "idx_handover_notes_store_id_work_date", columnList = "store_id, work_date"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class HandoverNote extends BaseTimeEntity {
 

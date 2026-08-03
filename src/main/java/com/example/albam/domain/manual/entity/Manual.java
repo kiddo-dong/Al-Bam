@@ -11,6 +11,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OrderColumn;
@@ -24,7 +25,7 @@ import lombok.NoArgsConstructor;
 /** 매장 매뉴얼 (레시피, 기기 사용법 등 영구적인 지식). 카테고리는 매장이 자유롭게 정한다. */
 @Getter
 @Entity
-@Table(name = "manuals")
+@Table(name = "manuals", indexes = @Index(name = "idx_manuals_store_id", columnList = "store_id"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Manual extends BaseTimeEntity {
 

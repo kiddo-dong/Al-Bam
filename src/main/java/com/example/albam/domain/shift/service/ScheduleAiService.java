@@ -36,10 +36,12 @@ import tools.jackson.databind.ObjectMapper;
  * AI(LLM)로 스케줄 초안을 생성하는 서비스. LLM 응답은 신뢰하지 않는 입력으로 취급하며, 실제 근로기준법 검증은
  * 전부 {@link ShiftService}의 기존 규칙(근무가능요일·영업시간·연소자보호·중복·주간상한)을 그대로 재사용한다.
  * LLM은 "그럴듯한 배치안"만 제시하고, 적법성 판단은 결코 LLM에게 맡기지 않는다.
+ *
+ * <p>클래스 레벨 트랜잭션을 두지 않는다 — generateDraft가 OpenAI 응답을 기다리는 동안 DB 커넥션을
+ * 붙잡지 않기 위함. DB 접근은 각 리포지토리/{@link ShiftService} 호출이 자체 트랜잭션으로 처리한다.
  */
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class ScheduleAiService {
 
     private static final int MAX_DRAFT_PERIOD_DAYS = 31;

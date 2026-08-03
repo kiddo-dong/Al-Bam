@@ -8,6 +8,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -18,7 +19,7 @@ import lombok.NoArgsConstructor;
 /** 근로기준법 Q&A 대화 세션. 매장이 아니라 사용자 소유의 전역 데이터다. */
 @Getter
 @Entity
-@Table(name = "labor_qa_sessions")
+@Table(name = "labor_qa_sessions", indexes = @Index(name = "idx_labor_qa_sessions_user_id", columnList = "user_id"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class LaborQaSession extends BaseTimeEntity {
 

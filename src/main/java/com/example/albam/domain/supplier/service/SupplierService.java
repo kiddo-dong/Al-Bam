@@ -12,6 +12,8 @@ import com.example.albam.domain.supplier.repository.SupplierItemRepository;
 import com.example.albam.domain.supplier.repository.SupplierRepository;
 import com.example.albam.global.exception.NotFoundException;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,8 +39,12 @@ public class SupplierService {
     /** 거래처 목록 + 각 거래처의 발주 품목(요일별 수량 포함) — OWNER/MANAGER 전용. */
     public List<SupplierResponse> getSuppliers(Long storeId, Long userId) {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
-        return supplierRepository.findAllByStoreIdOrderByCategoryAscDisplayOrderAscIdAsc(storeId).stream()
-                .map(supplier -> SupplierResponse.from(supplier, getItemResponses(supplier.getId())))
+        List<Supplier> suppliers = supplierRepository
+                .findAllByStoreIdOrderByCategoryAscDisplayOrderAscIdAsc(storeId);
+        Map<Long, List<SupplierItemResponse>> itemsBySupplierId = itemResponsesBySupplierId(suppliers);
+        return suppliers.stream()
+                .map(supplier -> SupplierResponse.from(supplier,
+                        itemsBySupplierId.getOrDefault(supplier.getId(), List.of())))
                 .toList();
     }
 
@@ -91,6 +97,16 @@ public class SupplierService {
         return supplierItemRepository.findAllBySupplierIdOrderByDisplayOrderAscIdAsc(supplierId).stream()
                 .map(SupplierItemResponse::from)
                 .toList();
+    }
+
+    private Map<Long, List<SupplierItemResponse>> itemResponsesBySupplierId(List<Supplier> suppliers) {
+        if (suppliers.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> supplierIds = suppliers.stream().map(Supplier::getId).toList();
+        return supplierItemRepository.findAllBySupplierIdInOrderByDisplayOrderAscIdAsc(supplierIds).stream()
+                .collect(Collectors.groupingBy(item -> item.getSupplier().getId(),
+                        Collectors.mapping(SupplierItemResponse::from, Collectors.toList())));
     }
 
     private Supplier getSupplierInStore(Long storeId, Long supplierId) {

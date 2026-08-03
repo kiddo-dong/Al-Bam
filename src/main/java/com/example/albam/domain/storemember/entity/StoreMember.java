@@ -14,6 +14,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -28,7 +29,9 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "store_members", uniqueConstraints = @UniqueConstraint(columnNames = {"store_id", "user_id"}))
+@Table(name = "store_members",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"store_id", "user_id"}),
+        indexes = @Index(name = "idx_store_members_user_id_status", columnList = "user_id, status"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class StoreMember extends BaseTimeEntity {
 

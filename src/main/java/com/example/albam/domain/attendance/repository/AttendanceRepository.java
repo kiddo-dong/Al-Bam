@@ -5,6 +5,7 @@ import com.example.albam.domain.attendance.entity.AttendanceStatus;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
@@ -13,9 +14,11 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     Optional<Attendance> findFirstByStoreMemberIdAndStatus(Long storeMemberId, AttendanceStatus status);
 
+    @EntityGraph(attributePaths = {"storeMember", "storeMember.user"})
     List<Attendance> findAllByStoreMemberIdAndWorkDateBetweenOrderByWorkDateDesc(
             Long storeMemberId, LocalDate from, LocalDate to);
 
+    @EntityGraph(attributePaths = {"storeMember", "storeMember.user"})
     List<Attendance> findAllByStoreMemberStoreIdAndWorkDateBetweenOrderByWorkDateDesc(
             Long storeId, LocalDate from, LocalDate to);
 

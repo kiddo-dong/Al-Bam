@@ -10,6 +10,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -20,7 +21,7 @@ import lombok.NoArgsConstructor;
 /** 오픈/마감 체크리스트 항목 마스터. 한 번 등록하면 매일 반복된다. */
 @Getter
 @Entity
-@Table(name = "checklist_items")
+@Table(name = "checklist_items", indexes = @Index(name = "idx_checklist_items_store_id", columnList = "store_id"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ChecklistItem extends BaseTimeEntity {
 

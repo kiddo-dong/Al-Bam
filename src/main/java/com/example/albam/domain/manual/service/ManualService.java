@@ -13,7 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -26,6 +28,7 @@ public class ManualService {
     private final ManualRepository manualRepository;
     private final StoreAuthorizationService storeAuthorizationService;
     private final S3Uploader s3Uploader;
+    private final PlatformTransactionManager transactionManager;
 
     @Transactional
     public ManualResponse createManual(Long storeId, Long userId, ManualRequest request) {
@@ -47,26 +50,35 @@ public class ManualService {
         return ManualResponse.from(getManualInStore(storeId, manualId));
     }
 
-    @Transactional
+    /**
+     * S3 삭제는 네트워크 호출이라 DB 트랜잭션 안에서 하지 않는다 — 커밋까지 커넥션을 붙잡지 않도록
+     * DB 갱신을 먼저 커밋한 뒤, 지워진 이미지는 트랜잭션 밖에서 정리한다.
+     */
     public ManualResponse updateManual(Long storeId, Long manualId, Long userId, ManualRequest request) {
-        storeAuthorizationService.requireOwnerOrManager(storeId, userId);
-        Manual manual = getManualInStore(storeId, manualId);
-        List<String> removedImages = new ArrayList<>(manual.getImageUrls());
-        if (request.imageUrls() != null) {
-            removedImages.removeAll(request.imageUrls());
-        }
-        manual.update(request.category(), request.title(), request.content(),
-                request.displayOrderOrDefault(), request.imageUrls());
+        List<String> removedImages = new ArrayList<>();
+        ManualResponse response = new TransactionTemplate(transactionManager).execute(status -> {
+            storeAuthorizationService.requireOwnerOrManager(storeId, userId);
+            Manual manual = getManualInStore(storeId, manualId);
+            removedImages.addAll(manual.getImageUrls());
+            if (request.imageUrls() != null) {
+                removedImages.removeAll(request.imageUrls());
+            }
+            manual.update(request.category(), request.title(), request.content(),
+                    request.displayOrderOrDefault(), request.imageUrls());
+            return ManualResponse.from(manual);
+        });
         removedImages.forEach(s3Uploader::delete);
-        return ManualResponse.from(manual);
+        return response;
     }
 
-    @Transactional
     public void deleteManual(Long storeId, Long manualId, Long userId) {
-        storeAuthorizationService.requireOwnerOrManager(storeId, userId);
-        Manual manual = getManualInStore(storeId, manualId);
-        List<String> images = new ArrayList<>(manual.getImageUrls());
-        manualRepository.delete(manual);
+        List<String> images = new TransactionTemplate(transactionManager).execute(status -> {
+            storeAuthorizationService.requireOwnerOrManager(storeId, userId);
+            Manual manual = getManualInStore(storeId, manualId);
+            List<String> removed = new ArrayList<>(manual.getImageUrls());
+            manualRepository.delete(manual);
+            return removed;
+        });
         images.forEach(s3Uploader::delete);
     }
 

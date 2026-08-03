@@ -13,8 +13,10 @@ import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.NotFoundException;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -40,10 +42,21 @@ public class NoticeService {
 
     public List<NoticeResponse> getNotices(Long storeId, Long userId) {
         StoreMember me = storeAuthorizationService.requireMember(storeId, userId);
-        return noticeRepository.findAllByStoreIdOrderByCreatedAtDesc(storeId).stream()
+        List<Notice> notices = noticeRepository.findAllByStoreIdOrderByCreatedAtDesc(storeId);
+        if (notices.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> noticeIds = notices.stream().map(Notice::getId).toList();
+        Map<Long, Long> readCountByNoticeId = noticeReadRepository.countByNoticeIdIn(noticeIds).stream()
+                .collect(Collectors.toMap(NoticeReadRepository.NoticeReadCount::getNoticeId,
+                        NoticeReadRepository.NoticeReadCount::getReadCount));
+        Set<Long> readNoticeIds = new HashSet<>(noticeReadRepository.findReadNoticeIds(me.getId(), noticeIds));
+
+        return notices.stream()
                 .map(notice -> NoticeResponse.from(notice,
-                        noticeReadRepository.countByNoticeId(notice.getId()),
-                        noticeReadRepository.existsByNoticeIdAndStoreMemberId(notice.getId(), me.getId())))
+                        readCountByNoticeId.getOrDefault(notice.getId(), 0L),
+                        readNoticeIds.contains(notice.getId())))
                 .toList();
     }
 

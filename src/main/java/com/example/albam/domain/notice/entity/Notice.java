@@ -9,6 +9,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -19,7 +20,7 @@ import lombok.NoArgsConstructor;
 /** 매장 공지사항. 관리자가 작성하고 멤버가 확인 버튼으로 읽음을 남긴다. */
 @Getter
 @Entity
-@Table(name = "notices")
+@Table(name = "notices", indexes = @Index(name = "idx_notices_store_id", columnList = "store_id"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Notice extends BaseTimeEntity {
 

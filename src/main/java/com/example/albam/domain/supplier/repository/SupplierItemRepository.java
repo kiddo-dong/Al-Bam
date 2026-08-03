@@ -9,6 +9,8 @@ public interface SupplierItemRepository extends JpaRepository<SupplierItem, Long
 
     List<SupplierItem> findAllBySupplierIdOrderByDisplayOrderAscIdAsc(Long supplierId);
 
+    List<SupplierItem> findAllBySupplierIdInOrderByDisplayOrderAscIdAsc(List<Long> supplierIds);
+
     Optional<SupplierItem> findByIdAndSupplierStoreId(Long id, Long storeId);
 
     void deleteBySupplierId(Long supplierId);

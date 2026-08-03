@@ -70,18 +70,24 @@ public class StoreDashboardService {
         int activeMemberCount = 0;
         List<MemberCostRow> rows = new ArrayList<>();
 
+        Map<Long, List<Attendance>> attendancesByMemberId = attendanceRepository
+                .findAllByStoreMemberStoreIdAndWorkDateBetweenOrderByWorkDateDesc(storeId, fetchFrom, fetchTo)
+                .stream()
+                .filter(attendance -> attendance.getStatus() == AttendanceStatus.DONE)
+                .collect(Collectors.groupingBy(attendance -> attendance.getStoreMember().getId()));
+        Map<Long, List<Shift>> shiftsByMemberId = shiftRepository
+                .findAllByStoreMemberStoreIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(
+                        storeId, fetchFrom, fetchTo)
+                .stream()
+                .filter(shift -> shift.getStatus() != ShiftStatus.CANCELED)
+                .collect(Collectors.groupingBy(shift -> shift.getStoreMember().getId()));
+
         for (StoreMember member : storeMemberRepository.findAllByStoreId(storeId)) {
             if (member.getStatus() == MemberStatus.ACTIVE) {
                 activeMemberCount++;
             }
-            List<Attendance> attendances = attendanceRepository
-                    .findAllByStoreMemberIdAndStatusAndWorkDateBetween(
-                            member.getId(), AttendanceStatus.DONE, fetchFrom, fetchTo);
-            List<Shift> shifts = shiftRepository
-                    .findAllByStoreMemberIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(
-                            member.getId(), fetchFrom, fetchTo).stream()
-                    .filter(shift -> shift.getStatus() != ShiftStatus.CANCELED)
-                    .toList();
+            List<Attendance> attendances = attendancesByMemberId.getOrDefault(member.getId(), List.of());
+            List<Shift> shifts = shiftsByMemberId.getOrDefault(member.getId(), List.of());
             Set<LocalDate> scheduledDates = shifts.stream()
                     .map(Shift::getWorkDate)
                     .collect(Collectors.toSet());

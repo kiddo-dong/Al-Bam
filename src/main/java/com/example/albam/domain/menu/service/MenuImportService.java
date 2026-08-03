@@ -10,6 +10,8 @@ import com.example.albam.domain.menu.dto.MenuIngredientRequest;
 import com.example.albam.domain.menu.dto.MenuIngredientResponse;
 import com.example.albam.domain.menu.dto.RejectedIngredientDraftItem;
 import com.example.albam.domain.menu.entity.IngredientUnit;
+import com.example.albam.domain.store.entity.Store;
+import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.file.SpreadsheetTextExtractor;
@@ -19,6 +21,7 @@ import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.ObjectMapper;
 
@@ -94,14 +97,16 @@ public class MenuImportService {
     }
 
     /** 사용자가 미리보기에서 확인한 목록을 실제 등록한다. 개별 실패는 전체를 막지 않고 rejected로 모아준다. */
+    @Transactional
     public ConfirmIngredientImportResult confirm(Long storeId, Long userId,
             ConfirmIngredientImportRequest request) {
-        storeAuthorizationService.requireOwnerOrManager(storeId, userId);
+        StoreMember manager = storeAuthorizationService.requireOwnerOrManager(storeId, userId);
+        Store store = manager.getStore();
         List<MenuIngredientResponse> created = new ArrayList<>();
         List<RejectedIngredientDraftItem> rejected = new ArrayList<>();
         for (MenuIngredientRequest item : request.items()) {
             try {
-                created.add(menuCostService.createIngredient(storeId, userId, item));
+                created.add(menuCostService.createIngredientFor(store, item));
             } catch (InvalidRequestException e) {
                 rejected.add(new RejectedIngredientDraftItem(item.name(), null, e.getMessage()));
             }

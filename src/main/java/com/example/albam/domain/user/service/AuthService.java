@@ -26,7 +26,10 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @RequiredArgsConstructor
@@ -43,36 +46,54 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final List<OAuthUserInfoFetcher> oAuthUserInfoFetchers;
     private final MailService mailService;
+    private final PlatformTransactionManager transactionManager;
 
     @Value("${app.base-url}")
     private String baseUrl;
 
-    @Transactional
+    /**
+     * 메일 발송(SMTP)은 트랜잭션 밖에서 한다 — DB 커밋까지 커넥션을 붙잡지 않기 위함이자,
+     * 메일 서버 장애로 이미 커밋된 가입을 롤백시키지 않기 위함. 인증 메일은 재발송 API로 복구 가능하다.
+     */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Long signup(SignupRequest request) {
         if (!request.password().equals(request.passwordConfirm())) {
             throw new InvalidRequestException("비밀번호가 일치하지 않습니다.");
         }
         validatePasswordComplexity(request.password());
-        if (userRepository.existsByEmail(request.email())) {
-            throw new ConflictException("이미 가입된 이메일입니다.");
-        }
-        if (userRepository.existsByPhone(request.phone())) {
-            throw new ConflictException("이미 가입된 전화번호입니다.");
-        }
-        User user = new User(request.email(), passwordEncoder.encode(request.password()),
-                request.name(), request.phone(), request.birthDate(), LocalDateTime.now());
-        userRepository.save(user);
-        sendVerificationMail(user);
-        return user.getId();
+        VerificationMail mail = new TransactionTemplate(transactionManager).execute(status -> {
+            if (userRepository.existsByEmail(request.email())) {
+                throw new ConflictException("이미 가입된 이메일입니다.");
+            }
+            if (userRepository.existsByPhone(request.phone())) {
+                throw new ConflictException("이미 가입된 전화번호입니다.");
+            }
+            User user = new User(request.email(), passwordEncoder.encode(request.password()),
+                    request.name(), request.phone(), request.birthDate(), LocalDateTime.now());
+            userRepository.save(user);
+            return prepareVerificationMail(user);
+        });
+        sendVerificationMail(mail);
+        return mail.userId();
     }
 
-    private void sendVerificationMail(User user) {
+    private VerificationMail prepareVerificationMail(User user) {
         EmailToken token = emailTokenRepository.save(new EmailToken(user, UUID.randomUUID().toString(),
                 EmailTokenType.VERIFY_EMAIL, LocalDateTime.now().plusHours(VERIFY_EMAIL_EXPIRATION_HOURS)));
-        String link = baseUrl + "/api/v1/auth/verify-email?token=" + token.getToken();
-        mailService.send(user.getEmail(), "[알밤] 이메일 인증을 완료해 주세요",
-                user.getName() + "님, 알밤 가입을 환영합니다!\n\n"
+        return new VerificationMail(user.getId(), user.getEmail(), user.getName(), token.getToken());
+    }
+
+    private void sendVerificationMail(VerificationMail mail) {
+        String link = baseUrl + "/api/v1/auth/verify-email?token=" + mail.token();
+        mailService.send(mail.email(), "[알밤] 이메일 인증을 완료해 주세요",
+                mail.name() + "님, 알밤 가입을 환영합니다!\n\n"
                         + "아래 링크를 클릭해 이메일 인증을 완료해 주세요. (24시간 이내)\n" + link);
+    }
+
+    private record VerificationMail(Long userId, String email, String name, String token) {
+    }
+
+    private record PasswordResetMail(String email, String name, String token) {
     }
 
     @Transactional
@@ -86,32 +107,41 @@ public class AuthService {
         emailToken.markUsed();
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void resendVerification(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new InvalidRequestException("가입되지 않은 이메일입니다."));
-        if (user.getProvider() != AuthProvider.LOCAL || user.isEmailVerified()) {
-            throw new InvalidRequestException("이메일 인증이 필요한 계정이 아닙니다.");
-        }
-        sendVerificationMail(user);
+        VerificationMail mail = new TransactionTemplate(transactionManager).execute(status -> {
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new InvalidRequestException("가입되지 않은 이메일입니다."));
+            if (user.getProvider() != AuthProvider.LOCAL || user.isEmailVerified()) {
+                throw new InvalidRequestException("이메일 인증이 필요한 계정이 아닙니다.");
+            }
+            return prepareVerificationMail(user);
+        });
+        sendVerificationMail(mail);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void requestPasswordReset(String email) {
         // 계정 존재 여부가 노출되지 않도록, 없는 이메일이거나 소셜 계정이어도 조용히 성공 처리한다
-        userRepository.findByEmail(email)
-                .filter(user -> user.getProvider() == AuthProvider.LOCAL)
-                .ifPresent(user -> {
-                    EmailToken token = emailTokenRepository.save(new EmailToken(user,
-                            UUID.randomUUID().toString(), EmailTokenType.PASSWORD_RESET,
-                            LocalDateTime.now().plusMinutes(PASSWORD_RESET_EXPIRATION_MINUTES)));
-                    mailService.send(user.getEmail(), "[알밤] 비밀번호 재설정 안내",
-                            user.getName() + "님, 비밀번호 재설정 요청이 접수되었습니다.\n\n"
-                                    + "아래 토큰으로 30분 이내에 새 비밀번호를 설정해 주세요.\n"
-                                    + "토큰: " + token.getToken() + "\n\n"
-                                    + "재설정 주소: " + baseUrl + "/api/v1/auth/password-reset/confirm\n"
-                                    + "본인이 요청하지 않았다면 이 메일을 무시하세요.");
-                });
+        PasswordResetMail mail = new TransactionTemplate(transactionManager).execute(status ->
+                userRepository.findByEmail(email)
+                        .filter(user -> user.getProvider() == AuthProvider.LOCAL)
+                        .map(user -> {
+                            EmailToken token = emailTokenRepository.save(new EmailToken(user,
+                                    UUID.randomUUID().toString(), EmailTokenType.PASSWORD_RESET,
+                                    LocalDateTime.now().plusMinutes(PASSWORD_RESET_EXPIRATION_MINUTES)));
+                            return new PasswordResetMail(user.getEmail(), user.getName(), token.getToken());
+                        })
+                        .orElse(null));
+        if (mail == null) {
+            return;
+        }
+        mailService.send(mail.email(), "[알밤] 비밀번호 재설정 안내",
+                mail.name() + "님, 비밀번호 재설정 요청이 접수되었습니다.\n\n"
+                        + "아래 토큰으로 30분 이내에 새 비밀번호를 설정해 주세요.\n"
+                        + "토큰: " + mail.token() + "\n\n"
+                        + "재설정 주소: " + baseUrl + "/api/v1/auth/password-reset/confirm\n"
+                        + "본인이 요청하지 않았다면 이 메일을 무시하세요.");
     }
 
     @Transactional

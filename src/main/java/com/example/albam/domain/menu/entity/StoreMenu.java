@@ -9,6 +9,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -23,7 +24,7 @@ import lombok.NoArgsConstructor;
 /** 판매 메뉴와 레시피(재료 사용량). 재료비·원가율·이익 계산의 단위가 된다. */
 @Getter
 @Entity
-@Table(name = "store_menus")
+@Table(name = "store_menus", indexes = @Index(name = "idx_store_menus_store_id", columnList = "store_id"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class StoreMenu extends BaseTimeEntity {
 
