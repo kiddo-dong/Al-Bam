@@ -22,7 +22,6 @@ import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.labor.LaborStandards;
-import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -61,8 +60,8 @@ public class StoreDashboardService {
         YearMonth yearMonth = YearMonth.of(year, month);
         LocalDate monthStart = yearMonth.atDay(1);
         LocalDate monthEnd = yearMonth.atEndOfMonth();
-        LocalDate fetchFrom = monthStart.with(DayOfWeek.MONDAY);
-        LocalDate fetchTo = monthEnd.with(DayOfWeek.SUNDAY);
+        LocalDate fetchFrom = LaborStandards.mondayOfWeek(monthStart);
+        LocalDate fetchTo = LaborStandards.sundayOfWeek(monthEnd);
 
         long totalWorkMinutes = 0;
         long totalLaborCost = 0;
@@ -158,8 +157,8 @@ public class StoreDashboardService {
     /** 주간 대시보드: 주 52시간(연소자 35시간) 상한·주휴 15시간 모니터링 (금액 없음). */
     public WeeklyDashboardResponse getWeeklyDashboard(Long storeId, Long userId, LocalDate date) {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
-        LocalDate weekStart = date.with(DayOfWeek.MONDAY);
-        LocalDate weekEnd = weekStart.plusDays(6);
+        LocalDate weekStart = LaborStandards.mondayOfWeek(date);
+        LocalDate weekEnd = LaborStandards.sundayOfWeek(date);
         LocalDate today = LocalDate.now();
 
         // 실근무: 이번 주의 근태 (근무 중이면 현재까지 누적)

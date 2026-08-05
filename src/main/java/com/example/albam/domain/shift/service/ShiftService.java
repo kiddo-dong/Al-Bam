@@ -217,8 +217,8 @@ public class ShiftService {
         }
         int capMinutes = minor ? LaborStandards.MINOR_MAX_WEEKLY_WORK_MINUTES
                 : LaborStandards.MAX_WEEKLY_WORK_MINUTES;
-        LocalDate weekStart = workDate.with(DayOfWeek.MONDAY);
-        LocalDate weekEnd = weekStart.plusDays(6);
+        LocalDate weekStart = LaborStandards.mondayOfWeek(workDate);
+        LocalDate weekEnd = LaborStandards.sundayOfWeek(workDate);
         long weeklyMinutes = spanMinutes(startTime, endTime) - breakMinutes;
         List<Shift> candidates = memberShiftsCache != null
                 ? filterByDateRange(memberShiftsCache, weekStart, weekEnd)

@@ -1,6 +1,7 @@
 package com.example.albam.global.labor;
 
 import com.example.albam.global.exception.InvalidRequestException;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.Period;
 
@@ -43,6 +44,16 @@ public final class LaborStandards {
     /** 근로기준법상 연소근로자(만 18세 미만) 여부. 생년월일 미입력(소셜 가입 등) 시 성인으로 간주한다. */
     public static boolean isMinor(LocalDate birthDate, LocalDate onDate) {
         return birthDate != null && Period.between(birthDate, onDate).getYears() < 18;
+    }
+
+    /** 해당 날짜가 속한 ISO 주(월~일)의 월요일. 주 단위 근로시간 집계 범위를 잡을 때 공통으로 쓴다. */
+    public static LocalDate mondayOfWeek(LocalDate date) {
+        return date.with(DayOfWeek.MONDAY);
+    }
+
+    /** 해당 날짜가 속한 ISO 주(월~일)의 일요일. */
+    public static LocalDate sundayOfWeek(LocalDate date) {
+        return date.with(DayOfWeek.SUNDAY);
     }
 
     /** 근로기준법 제54조: 근로시간 4시간 이상이면 30분, 8시간 이상이면 1시간 이상의 휴게를 줘야 한다. */

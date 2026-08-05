@@ -20,7 +20,6 @@ import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.exception.NotFoundException;
 import com.example.albam.global.labor.LaborStandards;
-import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -47,42 +46,16 @@ public class PayrollService {
 
     @Transactional
     public PayrollResponse getPayroll(Long storeId, Long memberId, Long userId, int year, int month) {
-        if (month < 1 || month > 12) {
-            throw new InvalidRequestException("월은 1~12 사이여야 합니다.");
-        }
         StoreMember target = getAuthorizedTarget(storeId, memberId, userId);
-
-        YearMonth yearMonth = YearMonth.of(year, month);
-        LocalDate monthStart = yearMonth.atDay(1);
-        LocalDate monthEnd = yearMonth.atEndOfMonth();
-        // 주 단위 판정(연장·주휴)을 위해 월과 겹치는 ISO 주 전체를 조회한다
-        LocalDate fetchFrom = monthStart.with(DayOfWeek.MONDAY);
-        LocalDate fetchTo = monthEnd.with(DayOfWeek.SUNDAY);
-
-        List<Attendance> attendances = attendanceRepository.findAllByStoreMemberIdAndStatusAndWorkDateBetween(
-                target.getId(), AttendanceStatus.DONE, fetchFrom, fetchTo);
-        List<Shift> shifts = shiftRepository
-                .findAllByStoreMemberIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(
-                        target.getId(), fetchFrom, fetchTo).stream()
-                .filter(shift -> shift.getStatus() != ShiftStatus.CANCELED)
-                .toList();
-        // 주휴수당 개근 판정용: 비취소 스케줄 날짜
-        Set<LocalDate> scheduledDates = shifts.stream()
-                .map(Shift::getWorkDate)
-                .collect(Collectors.toSet());
-
-        PayrollResult result = PayrollCalculator.calculate(attendances, target.getHourlyWage(),
-                target.getStore().isSmallBusiness(), target.getWeeklyHolidayDay(), scheduledDates, yearMonth);
-        long leavePay = calculateLeavePay(target, shifts, monthStart, monthEnd);
-        long grossPay = result.regularPay() + result.overtimePay() + result.nightPay()
-                + result.holidayWorkPay() + result.weeklyHolidayPay() + leavePay;
-        long deduction = calculateDeduction(target.getTaxMode(), grossPay);
+        MonthlyPayrollComputation computation = computeMonthly(target, year, month, false);
+        PayrollResult result = computation.result();
 
         Payroll payroll = payrollRepository
                 .findByStoreMemberIdAndTargetYearAndTargetMonth(target.getId(), year, month)
                 .orElseGet(() -> new Payroll(target, year, month));
         payroll.applyResult(result.regularPay(), result.overtimePay(), result.nightPay(),
-                result.holidayWorkPay(), result.weeklyHolidayPay(), leavePay, deduction);
+                result.holidayWorkPay(), result.weeklyHolidayPay(), computation.leavePay(),
+                computation.deduction());
         payrollRepository.save(payroll);
 
         return PayrollResponse.from(payroll);
@@ -90,38 +63,13 @@ public class PayrollService {
 
     /** 급여명세서 상세: 항목별 금액 + 계산 근거(근로시간) + 공제 + 일별 근무 기록. */
     public PayslipResponse getPayslip(Long storeId, Long memberId, Long userId, int year, int month) {
-        if (month < 1 || month > 12) {
-            throw new InvalidRequestException("월은 1~12 사이여야 합니다.");
-        }
         StoreMember target = getAuthorizedTarget(storeId, memberId, userId);
+        MonthlyPayrollComputation computation = computeMonthly(target, year, month, false);
+        PayrollResult result = computation.result();
 
-        YearMonth yearMonth = YearMonth.of(year, month);
-        LocalDate monthStart = yearMonth.atDay(1);
-        LocalDate monthEnd = yearMonth.atEndOfMonth();
-        LocalDate fetchFrom = monthStart.with(DayOfWeek.MONDAY);
-        LocalDate fetchTo = monthEnd.with(DayOfWeek.SUNDAY);
-
-        List<Attendance> attendances = attendanceRepository.findAllByStoreMemberIdAndStatusAndWorkDateBetween(
-                target.getId(), AttendanceStatus.DONE, fetchFrom, fetchTo);
-        List<Shift> shifts = shiftRepository
-                .findAllByStoreMemberIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(
-                        target.getId(), fetchFrom, fetchTo).stream()
-                .filter(shift -> shift.getStatus() != ShiftStatus.CANCELED)
-                .toList();
-        Set<LocalDate> scheduledDates = shifts.stream()
-                .map(Shift::getWorkDate)
-                .collect(Collectors.toSet());
-
-        PayrollResult result = PayrollCalculator.calculate(attendances, target.getHourlyWage(),
-                target.getStore().isSmallBusiness(), target.getWeeklyHolidayDay(), scheduledDates, yearMonth);
-        long leavePay = calculateLeavePay(target, shifts, monthStart, monthEnd);
-        long totalPay = result.regularPay() + result.overtimePay() + result.nightPay()
-                + result.holidayWorkPay() + result.weeklyHolidayPay() + leavePay;
-        long deduction = calculateDeduction(target.getTaxMode(), totalPay);
-
-        List<PayslipResponse.DailyWorkRecord> dailyRecords = attendances.stream()
-                .filter(attendance -> !attendance.getWorkDate().isBefore(monthStart)
-                        && !attendance.getWorkDate().isAfter(monthEnd))
+        List<PayslipResponse.DailyWorkRecord> dailyRecords = computation.attendances().stream()
+                .filter(attendance -> !attendance.getWorkDate().isBefore(computation.monthStart())
+                        && !attendance.getWorkDate().isAfter(computation.monthEnd()))
                 .sorted(Comparator.comparing(Attendance::getClockInAt))
                 .map(attendance -> new PayslipResponse.DailyWorkRecord(
                         attendance.getWorkDate(),
@@ -137,8 +85,8 @@ public class PayrollService {
                 Math.round(result.totalWorkedHours() * 60), Math.round(result.overtimeHours() * 60),
                 Math.round(result.nightHours() * 60), Math.round(result.holidayWorkHours() * 60),
                 result.regularPay(), result.overtimePay(), result.nightPay(), result.holidayWorkPay(),
-                result.weeklyHolidayPay(), leavePay, totalPay, target.getTaxMode(), deduction,
-                totalPay - deduction, dailyRecords);
+                result.weeklyHolidayPay(), computation.leavePay(), computation.totalPay(), target.getTaxMode(),
+                computation.deduction(), computation.totalPay() - computation.deduction(), dailyRecords);
     }
 
     /** 대상 멤버 조회 + 접근 권한 확인 (본인 또는 매장 관리자). */
@@ -161,17 +109,31 @@ public class PayrollService {
      * (미래 스케줄 날짜는 출근한 것으로 간주하므로 주휴수당 개근 요건도 낙관적으로 평가된다)
      */
     public PayrollEstimateResponse estimateMyPayroll(Long storeId, Long userId, int year, int month) {
+        StoreMember member = storeAuthorizationService.requireMember(storeId, userId);
+        MonthlyPayrollComputation computation = computeMonthly(member, year, month, true);
+        PayrollResult result = computation.result();
+
+        return new PayrollEstimateResponse(member.getId(), year, month, LocalDate.now(),
+                result.regularPay(), result.overtimePay(), result.nightPay(), result.holidayWorkPay(),
+                result.weeklyHolidayPay(), computation.leavePay(), computation.totalPay(),
+                computation.deduction(), computation.totalPay() - computation.deduction());
+    }
+
+    /**
+     * 월 급여 계산에 필요한 공통 파이프라인: 월 검증 → 겹치는 ISO 주 전체 근태/스케줄 조회 → 계산.
+     * includeFutureScheduleAsWorked가 true면(예상 급여 조회) 아직 오지 않은 스케줄을 출근한 것으로 간주한
+     * 가상 근태를 더한다.
+     */
+    private MonthlyPayrollComputation computeMonthly(StoreMember member, int year, int month,
+            boolean includeFutureScheduleAsWorked) {
         if (month < 1 || month > 12) {
             throw new InvalidRequestException("월은 1~12 사이여야 합니다.");
         }
-        StoreMember member = storeAuthorizationService.requireMember(storeId, userId);
-
         YearMonth yearMonth = YearMonth.of(year, month);
         LocalDate monthStart = yearMonth.atDay(1);
         LocalDate monthEnd = yearMonth.atEndOfMonth();
-        LocalDate fetchFrom = monthStart.with(DayOfWeek.MONDAY);
-        LocalDate fetchTo = monthEnd.with(DayOfWeek.SUNDAY);
-        LocalDate today = LocalDate.now();
+        LocalDate fetchFrom = LaborStandards.mondayOfWeek(monthStart);
+        LocalDate fetchTo = LaborStandards.sundayOfWeek(monthEnd);
 
         List<Attendance> attendances = new ArrayList<>(
                 attendanceRepository.findAllByStoreMemberIdAndStatusAndWorkDateBetween(
@@ -181,9 +143,12 @@ public class PayrollService {
                         member.getId(), fetchFrom, fetchTo).stream()
                 .filter(shift -> shift.getStatus() != ShiftStatus.CANCELED)
                 .toList();
-        for (Shift shift : shifts) {
-            if (shift.getWorkDate().isAfter(today)) {
-                attendances.add(syntheticAttendance(member, shift));
+        if (includeFutureScheduleAsWorked) {
+            LocalDate today = LocalDate.now();
+            for (Shift shift : shifts) {
+                if (shift.getWorkDate().isAfter(today)) {
+                    attendances.add(syntheticAttendance(member, shift));
+                }
             }
         }
         Set<LocalDate> scheduledDates = shifts.stream()
@@ -197,9 +162,18 @@ public class PayrollService {
                 + result.holidayWorkPay() + result.weeklyHolidayPay() + leavePay;
         long deduction = calculateDeduction(member.getTaxMode(), totalPay);
 
-        return new PayrollEstimateResponse(member.getId(), year, month, today,
-                result.regularPay(), result.overtimePay(), result.nightPay(), result.holidayWorkPay(),
-                result.weeklyHolidayPay(), leavePay, totalPay, deduction, totalPay - deduction);
+        return new MonthlyPayrollComputation(monthStart, monthEnd, attendances, result, leavePay, totalPay,
+                deduction);
+    }
+
+    private record MonthlyPayrollComputation(
+            LocalDate monthStart,
+            LocalDate monthEnd,
+            List<Attendance> attendances,
+            PayrollResult result,
+            long leavePay,
+            long totalPay,
+            long deduction) {
     }
 
     /** 스케줄대로 근무한다고 가정한 가상 근태 (저장하지 않음). */
