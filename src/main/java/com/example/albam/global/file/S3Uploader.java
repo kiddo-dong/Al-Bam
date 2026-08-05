@@ -1,8 +1,11 @@
 package com.example.albam.global.file;
 
 import com.example.albam.global.exception.InvalidRequestException;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Set;
 import java.util.UUID;
+import javax.imageio.ImageIO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -12,11 +15,14 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
+/** 프로필/매뉴얼 이미지 전용 업로더. 클라이언트가 보낸 Content-Type을 그대로 신뢰하지 않고,
+ * 화이트리스트 검증 + 실제 이미지 디코딩 검증을 거친 뒤에만 S3에 올린다 (위장 파일을 통한 저장형 XSS 방지). */
 @Component
 @RequiredArgsConstructor
 public class S3Uploader {
 
     private static final String AMAZON_S3_HOST = ".amazonaws.com/";
+    private static final Set<String> ALLOWED_IMAGE_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/gif");
 
     private final S3Client s3Client;
 
@@ -30,18 +36,29 @@ public class S3Uploader {
         if (file == null || file.isEmpty()) {
             throw new InvalidRequestException("업로드할 파일이 비어 있습니다.");
         }
-        String key = directory + "/" + UUID.randomUUID() + "-" + sanitizeFilename(file.getOriginalFilename());
-        try {
-            s3Client.putObject(
-                    PutObjectRequest.builder()
-                            .bucket(bucketName)
-                            .key(key)
-                            .contentType(file.getContentType())
-                            .build(),
-                    RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
-        } catch (IOException e) {
-            throw new InvalidRequestException("파일 업로드에 실패했습니다.");
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_IMAGE_CONTENT_TYPES.contains(contentType)) {
+            throw new InvalidRequestException("이미지 파일(JPEG/PNG/GIF)만 업로드할 수 있습니다.");
         }
+
+        byte[] content;
+        try {
+            content = file.getBytes();
+            if (ImageIO.read(new ByteArrayInputStream(content)) == null) {
+                throw new InvalidRequestException("올바른 이미지 파일이 아닙니다.");
+            }
+        } catch (IOException e) {
+            throw new InvalidRequestException("파일을 읽을 수 없습니다.");
+        }
+
+        String key = directory + "/" + UUID.randomUUID() + "-" + sanitizeFilename(file.getOriginalFilename());
+        s3Client.putObject(
+                PutObjectRequest.builder()
+                        .bucket(bucketName)
+                        .key(key)
+                        .contentType(contentType)
+                        .build(),
+                RequestBody.fromBytes(content));
         return "https://%s.s3.%s.amazonaws.com/%s".formatted(bucketName, region, key);
     }
 

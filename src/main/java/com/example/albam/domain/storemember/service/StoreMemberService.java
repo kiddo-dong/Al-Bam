@@ -52,6 +52,9 @@ public class StoreMemberService {
             throw new ForbiddenException("매장 소유자 정보는 이 API로 변경할 수 없습니다.");
         }
         if (request.role() != null) {
+            if (request.role() == MemberRole.OWNER) {
+                throw new ForbiddenException("소유권 이전은 이 API로 할 수 없습니다. 소유권 이전 기능을 이용해 주세요.");
+            }
             target.changeRole(request.role());
         }
         if (request.hourlyWage() != null) {
