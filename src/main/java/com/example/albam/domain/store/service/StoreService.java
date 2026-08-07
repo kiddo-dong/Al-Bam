@@ -35,7 +35,7 @@ public class StoreService {
 
     private static final int OWNER_DEFAULT_WAGE = 0;
     private static final int INVITE_CODE_LENGTH = 6;
-    private static final String INVITE_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 초대 코드 생성시 이 문자열에서 랜덤으로 뽑아 조합
+    private static final String INVITE_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ1234567890"; // 초대 코드 생성시 이 문자열에서 랜덤으로 뽑아 조합
 
     private final StoreRepository storeRepository;
     private final StoreMemberRepository storeMemberRepository;
