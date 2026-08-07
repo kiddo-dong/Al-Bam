@@ -28,7 +28,7 @@ class PayrollCalculatorTest {
     private static final LocalDate SUN = LocalDate.of(2026, 1, 11);
 
     @Test
-    void 하루_8시간_근무는_전부_기본급이다() {
+    void eightHourDay_isAllRegularPay() {
         List<Attendance> attendances = List.of(attendance(MON, LocalTime.of(9, 0), LocalTime.of(18, 0), 60));
 
         PayrollResult result = PayrollCalculator.calculate(attendances, WAGE, false, null, Set.of(), JANUARY_2026);
@@ -42,7 +42,7 @@ class PayrollCalculatorTest {
     }
 
     @Test
-    void 하루_8시간_초과분은_연장근로_1_5배다() {
+    void hoursOverEightInADay_earnOvertimeAt1_5x() {
         List<Attendance> attendances = List.of(attendance(MON, LocalTime.of(9, 0), LocalTime.of(19, 0), 60));
 
         PayrollResult result = PayrollCalculator.calculate(attendances, WAGE, false, null, Set.of(), JANUARY_2026);
@@ -54,7 +54,7 @@ class PayrollCalculatorTest {
     }
 
     @Test
-    void 하루는_8시간_이하여도_주_40시간_초과분은_연장근로다() {
+    void hoursOverFortyInAWeek_earnOvertimeEvenWithoutDailyOvertime() {
         List<Attendance> attendances = List.of(
                 attendance(MON, LocalTime.of(9, 0), LocalTime.of(18, 0), 60),
                 attendance(TUE, LocalTime.of(9, 0), LocalTime.of(18, 0), 60),
@@ -73,7 +73,7 @@ class PayrollCalculatorTest {
     }
 
     @Test
-    void 야간시간대_근무는_가산수당이_붙는다() {
+    void nightShiftHours_earnNightPremium() {
         List<Attendance> attendances = List.of(
                 attendance(MON.atTime(20, 0), MON.plusDays(1).atTime(2, 0), 0));
 
@@ -86,7 +86,7 @@ class PayrollCalculatorTest {
     }
 
     @Test
-    void 주휴일_근무는_기본급과_별개로_휴일가산이_붙는다() {
+    void workingOnWeeklyHolidayDay_earnsHolidayPremiumOnTopOfRegularPay() {
         List<Attendance> attendances = List.of(attendance(SUN, LocalTime.of(9, 0), LocalTime.of(19, 0), 60));
 
         PayrollResult result = PayrollCalculator.calculate(
@@ -100,7 +100,7 @@ class PayrollCalculatorTest {
     }
 
     @Test
-    void 개근하고_주15시간_이상이면_주휴수당이_나온다() {
+    void perfectAttendanceAndFifteenPlusHoursAWeek_earnsWeeklyHolidayPay() {
         Set<LocalDate> scheduledDates = Set.of(MON, TUE, WED, THU, FRI);
         List<Attendance> attendances = List.of(
                 attendance(MON, LocalTime.of(9, 0), LocalTime.of(18, 0), 60),
@@ -117,7 +117,7 @@ class PayrollCalculatorTest {
     }
 
     @Test
-    void 주15시간_미만이면_개근해도_주휴수당이_없다() {
+    void underFifteenHoursAWeek_noWeeklyHolidayPayEvenWithPerfectAttendance() {
         Set<LocalDate> scheduledDates = Set.of(MON);
         List<Attendance> attendances = List.of(attendance(MON, LocalTime.of(9, 0), LocalTime.of(14, 0), 0));
 
@@ -128,7 +128,7 @@ class PayrollCalculatorTest {
     }
 
     @Test
-    void 스케줄된_날_결근하면_시간을_채워도_주휴수당이_없다() {
+    void absentOnScheduledDay_noWeeklyHolidayPayEvenIfHoursMet() {
         Set<LocalDate> scheduledDates = Set.of(MON, TUE, WED); // 수요일 스케줄은 있지만 결근
         List<Attendance> attendances = List.of(
                 attendance(MON, LocalTime.of(9, 0), LocalTime.of(18, 0), 60),
@@ -143,7 +143,7 @@ class PayrollCalculatorTest {
     }
 
     @Test
-    void 오인미만_사업장은_연장야간휴일가산이_없지만_주휴수당은_그대로_나온다() {
+    void smallBusinessUnderFiveEmployees_noOvertimeNightHolidayPremiumButStillGetsWeeklyHolidayPay() {
         List<Attendance> attendances = List.of(
                 attendance(MON, LocalTime.of(8, 0), LocalTime.of(20, 0), 60), // 11시간, 일 연장 3시간
                 attendance(TUE, LocalTime.of(9, 0), LocalTime.of(18, 0), 60)); // 8시간
@@ -161,7 +161,7 @@ class PayrollCalculatorTest {
     }
 
     @Test
-    void 주휴수당은_그_주_일요일이_속한_달에_귀속된다() {
+    void weeklyHolidayPay_isAttributedToMonthContainingThatWeeksSunday() {
         // 2026-01-26(월) ~ 2026-02-01(일): 근무는 전부 1월, 주휴수당은 2월로 귀속되어야 한다.
         LocalDate mon = LocalDate.of(2026, 1, 26);
         LocalDate tue = LocalDate.of(2026, 1, 27);
