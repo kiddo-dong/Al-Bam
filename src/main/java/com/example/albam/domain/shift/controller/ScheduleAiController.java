@@ -6,6 +6,7 @@ import com.example.albam.domain.shift.dto.ScheduleDraftRequest;
 import com.example.albam.domain.shift.dto.ScheduleDraftResponse;
 import com.example.albam.domain.shift.service.ScheduleAiService;
 import com.example.albam.global.common.ApiResponse;
+import com.example.albam.global.ratelimit.RateLimit;
 import com.example.albam.global.security.CurrentUserId;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ public class ScheduleAiController {
     private final ScheduleAiService scheduleAiService;
 
     /** AI 스케줄 초안 생성 (OWNER/MANAGER). 저장되지 않으며, 기존 법정 검증을 통과한 항목만 accepted로 내려온다. */
+    @RateLimit(limit = 5, windowMinutes = 10)
     @PostMapping
     public ApiResponse<ScheduleDraftResponse> generateDraft(@PathVariable Long storeId,
             @CurrentUserId Long userId, @Valid @RequestBody ScheduleDraftRequest request) {

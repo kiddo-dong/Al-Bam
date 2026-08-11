@@ -7,6 +7,7 @@ import com.example.albam.domain.laborqa.dto.LaborQaSessionResponse;
 import com.example.albam.domain.laborqa.service.LaborQaService;
 import com.example.albam.domain.laborqa.service.LaborQaSessionService;
 import com.example.albam.global.common.ApiResponse;
+import com.example.albam.global.ratelimit.RateLimit;
 import com.example.albam.global.security.CurrentUserId;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -31,6 +32,7 @@ public class LaborQaController {
     private final LaborQaSessionService sessionService;
 
     /** 단발 질문 (대화 이력 없음). 간단한 위젯형 UI에 적합. */
+    @RateLimit(limit = 10, windowMinutes = 1)
     @PostMapping("/ask")
     public ApiResponse<LaborQaResponse> ask(@Valid @RequestBody LaborQaRequest request) {
         return ApiResponse.success(laborQaService.ask(request));
@@ -57,6 +59,7 @@ public class LaborQaController {
     }
 
     /** 세션 안에서 질문. 직전 대화가 프롬프트에 포함되고, 질문·답변이 이력으로 저장된다. */
+    @RateLimit(limit = 10, windowMinutes = 1)
     @PostMapping("/sessions/{sessionId}/ask")
     public ApiResponse<LaborQaResponse> askInSession(@PathVariable Long sessionId,
             @CurrentUserId Long userId, @Valid @RequestBody LaborQaRequest request) {

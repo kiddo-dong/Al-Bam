@@ -5,6 +5,7 @@ import com.example.albam.domain.menu.dto.ConfirmIngredientImportResult;
 import com.example.albam.domain.menu.dto.IngredientImportDraftResponse;
 import com.example.albam.domain.menu.service.MenuImportService;
 import com.example.albam.global.common.ApiResponse;
+import com.example.albam.global.ratelimit.RateLimit;
 import com.example.albam.global.security.CurrentUserId;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class MenuImportController {
     private final MenuImportService menuImportService;
 
     /** 엑셀(xlsx/xls)/CSV 업로드 → AI가 재료 목록 초안 추출 (저장 안 됨, 미리보기용). */
+    @RateLimit(limit = 5, windowMinutes = 10)
     @PostMapping("/ingredients/analyze")
     public ApiResponse<IngredientImportDraftResponse> analyzeIngredients(@PathVariable Long storeId,
             @CurrentUserId Long userId, @RequestParam MultipartFile file) {
