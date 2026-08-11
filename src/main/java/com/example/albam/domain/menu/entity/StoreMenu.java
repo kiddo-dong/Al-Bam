@@ -43,7 +43,7 @@ public class StoreMenu extends BaseTimeEntity {
     @Column(nullable = false)
     private int sellingPrice;
 
-    /** 자유 카테고리 (커피, 티, 디저트 등). */
+    /** 자유 카테고리 (커피, 디저트, 식사, 사이드 등 매장이 직접 정의). */
     @Column(nullable = false)
     private String category;
 

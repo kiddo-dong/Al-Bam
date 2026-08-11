@@ -13,7 +13,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** 레시피 한 줄: 어떤 재료를 1잔에 얼마나 쓰는지. */
+/** 레시피 한 줄: 어떤 재료를 메뉴 1인분에 얼마나 쓰는지. */
 @Getter
 @Entity
 @Table(name = "menu_recipe_items")
@@ -32,7 +32,7 @@ public class MenuRecipeItem {
     @JoinColumn(name = "ingredient_id", nullable = false)
     private MenuIngredient ingredient;
 
-    /** 1잔 사용량 (재료의 unit 기준). */
+    /** 1인분 사용량 (재료의 unit 기준). */
     @Column(nullable = false)
     private double amount;
 
@@ -42,7 +42,7 @@ public class MenuRecipeItem {
         this.amount = amount;
     }
 
-    /** 이 줄의 1잔 재료비 = 단위단가 × 사용량. */
+    /** 이 줄의 1인분 재료비 = 단위단가 × 사용량. */
     public double lineCost() {
         return ingredient.unitCost() * amount;
     }

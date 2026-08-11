@@ -36,7 +36,7 @@ public class MenuIngredient extends BaseTimeEntity {
     @Column(nullable = false)
     private String name;
 
-    /** 구매 제품 정보 (예: "SizeUp · 과일프로젝트 딸기청 1.4kg"). */
+    /** 구매 제품 정보 (예: "SizeUp · 과일프로젝트 딸기청 1.4kg", "곰곰 냉동 삼겹살 1kg"). */
     private String productInfo;
 
     /** 구매가 (원). */
@@ -55,7 +55,7 @@ public class MenuIngredient extends BaseTimeEntity {
     @Column(nullable = false)
     private int lossRate;
 
-    /** 자유 카테고리 (원두/커피, 유제품 등 매장이 직접 정의). */
+    /** 자유 카테고리 (원두, 유제품, 육류, 채소 등 매장이 직접 정의). */
     @Column(nullable = false)
     private String category;
 
