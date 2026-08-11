@@ -29,4 +29,5 @@ description: The build-verification ritual for this project before committing an
 
 - **새 인프라 의존성 추가 시(DB, 외부 API 등)**: 로컬에 해당 인프라가 없어도 **앱 전체가 부팅 실패하면 안 된다.** `@Lazy` + `ObjectProvider<T>`로 지연 주입하고, 실제 사용 시점에만 실패하도록 만들 것 (S3Uploader/MailService/AiConfig.vectorStore가 이 패턴의 선례).
   - 주의: `@Lazy`는 **빈을 만드는 쪽(`@Bean` 메서드)**과 **주입받는 쪽(생성자 파라미터)** 양쪽에 다 신경 써야 한다. Lombok `@RequiredArgsConstructor`로 일반 필드 주입하면 그 필드를 가진 서비스가 만들어질 때 즉시 연결을 시도해버려서 지연 효과가 없어진다 — `ObjectProvider<T>`로 감싸고 실제 사용 지점에서 `.getObject()` 호출해야 진짜로 지연된다.
-- **재기동마다 데이터를 다시 채우는 배치/적재 로직**: 대상이 인메모리(예: SimpleVectorStore)면 무해하지만, 영속 저장소(pgvector 등)로 바뀌면 중복 적재가 되므로 `removeExistingVectorStoreTable(true)` 같은 초기화 옵션을 반드시 같이 챙길 것.
+- **재기동마다 데이터를 다시 채우는 배치/적재 로직**: 대상이 인메모리면 무해하지만, 영속 저장소(S3 Vectors 등)에서는 중복이 쌓인다. 근로기준법 Q&A 지식베이스가 이 문제를 겪어 기동 시 자동 적재를 없애고 관리자 트리거 API로 바꿨으며, 청크 ID를 내용 해시로 고정해 재적재 시 덮어쓰게 했다. 비슷한 적재 로직을 추가할 때 같은 방식을 따를 것.
+- **DB 스키마 변경**: `ddl-auto=validate`라 엔티티만 고치면 부팅이 실패한다. `src/main/resources/db/migration/`에 `V{N}__설명.sql` 마이그레이션을 함께 추가해야 한다.
