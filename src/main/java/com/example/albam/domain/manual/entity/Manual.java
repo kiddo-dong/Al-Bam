@@ -53,34 +53,35 @@ public class Manual extends BaseTimeEntity {
     @Column(nullable = false)
     private int displayOrder;
 
+    /** 본문 이미지들의 S3 key (전체 URL이 아님). 공개 URL은 응답을 만들 때 조립한다. */
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "manual_images", joinColumns = @JoinColumn(name = "manual_id"))
     @OrderColumn(name = "sort_order")
-    @Column(name = "image_url")
-    private List<String> imageUrls = new ArrayList<>();
+    @Column(name = "image_key")
+    private List<String> imageKeys = new ArrayList<>();
 
     public Manual(Store store, StoreMember author, String category, String title, String content,
-            int displayOrder, List<String> imageUrls) {
+            int displayOrder, List<String> imageKeys) {
         this.store = store;
         this.author = author;
         this.category = category;
         this.title = title;
         this.content = content;
         this.displayOrder = displayOrder;
-        if (imageUrls != null) {
-            this.imageUrls.addAll(imageUrls);
+        if (imageKeys != null) {
+            this.imageKeys.addAll(imageKeys);
         }
     }
 
     public void update(String category, String title, String content, int displayOrder,
-            List<String> imageUrls) {
+            List<String> imageKeys) {
         this.category = category;
         this.title = title;
         this.content = content;
         this.displayOrder = displayOrder;
-        this.imageUrls.clear();
-        if (imageUrls != null) {
-            this.imageUrls.addAll(imageUrls);
+        this.imageKeys.clear();
+        if (imageKeys != null) {
+            this.imageKeys.addAll(imageKeys);
         }
     }
 }

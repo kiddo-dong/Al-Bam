@@ -34,8 +34,8 @@ public class ManualService {
     public ManualResponse createManual(Long storeId, Long userId, ManualRequest request) {
         StoreMember author = storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         Manual manual = manualRepository.save(new Manual(author.getStore(), author, request.category(),
-                request.title(), request.content(), request.displayOrderOrDefault(), request.imageUrls()));
-        return ManualResponse.from(manual);
+                request.title(), request.content(), request.displayOrderOrDefault(), request.imageKeys()));
+        return toResponse(manual);
     }
 
     public List<ManualSummaryResponse> getManuals(Long storeId, Long userId) {
@@ -47,7 +47,7 @@ public class ManualService {
 
     public ManualResponse getManual(Long storeId, Long manualId, Long userId) {
         storeAuthorizationService.requireMember(storeId, userId);
-        return ManualResponse.from(getManualInStore(storeId, manualId));
+        return toResponse(getManualInStore(storeId, manualId));
     }
 
     /**
@@ -55,19 +55,19 @@ public class ManualService {
      * DB 갱신을 먼저 커밋한 뒤, 지워진 이미지는 트랜잭션 밖에서 정리한다.
      */
     public ManualResponse updateManual(Long storeId, Long manualId, Long userId, ManualRequest request) {
-        List<String> removedImages = new ArrayList<>();
+        List<String> removedImageKeys = new ArrayList<>();
         ManualResponse response = new TransactionTemplate(transactionManager).execute(status -> {
             storeAuthorizationService.requireOwnerOrManager(storeId, userId);
             Manual manual = getManualInStore(storeId, manualId);
-            removedImages.addAll(manual.getImageUrls());
-            if (request.imageUrls() != null) {
-                removedImages.removeAll(request.imageUrls());
+            removedImageKeys.addAll(manual.getImageKeys());
+            if (request.imageKeys() != null) {
+                removedImageKeys.removeAll(request.imageKeys());
             }
             manual.update(request.category(), request.title(), request.content(),
-                    request.displayOrderOrDefault(), request.imageUrls());
-            return ManualResponse.from(manual);
+                    request.displayOrderOrDefault(), request.imageKeys());
+            return toResponse(manual);
         });
-        removedImages.forEach(s3Uploader::delete);
+        removedImageKeys.forEach(s3Uploader::delete);
         return response;
     }
 
@@ -75,17 +75,24 @@ public class ManualService {
         List<String> images = new TransactionTemplate(transactionManager).execute(status -> {
             storeAuthorizationService.requireOwnerOrManager(storeId, userId);
             Manual manual = getManualInStore(storeId, manualId);
-            List<String> removed = new ArrayList<>(manual.getImageUrls());
+            List<String> removed = new ArrayList<>(manual.getImageKeys());
             manualRepository.delete(manual);
             return removed;
         });
         images.forEach(s3Uploader::delete);
     }
 
-    /** 매뉴얼 본문에 넣을 이미지를 먼저 업로드하고 URL을 돌려받는다. */
+    /** 매뉴얼 본문에 넣을 이미지를 먼저 업로드하고 S3 key를 돌려받는다. 이 key를 그대로 매뉴얼 저장 요청에 넣는다. */
     public String uploadImage(Long storeId, Long userId, MultipartFile image) {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         return s3Uploader.upload(image, MANUAL_IMAGE_DIRECTORY);
+    }
+
+    /** 엔티티에는 S3 key만 있으므로, 응답을 만들 때 공개 URL로 조립한다. */
+    private ManualResponse toResponse(Manual manual) {
+        return ManualResponse.from(manual, manual.getImageKeys().stream()
+                .map(s3Uploader::toPublicUrl)
+                .toList());
     }
 
     private Manual getManualInStore(Long storeId, Long manualId) {

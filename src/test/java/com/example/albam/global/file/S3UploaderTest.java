@@ -72,38 +72,53 @@ class S3UploaderTest {
     }
 
     @Test
-    void upload_succeedsForARealPngImage() throws IOException {
+    void upload_returnsKeyNotFullUrl() throws IOException {
         MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", realPngBytes());
 
-        String url = s3Uploader.upload(file, "profile-images");
+        String key = s3Uploader.upload(file, "profile-images");
 
-        assertThat(url).startsWith("https://albam-test-bucket.s3.ap-northeast-2.amazonaws.com/profile-images/");
+        // 호스트가 섞이면 버킷을 옮길 때 DB에 저장된 값이 전부 죽으므로, key만 나와야 한다.
+        assertThat(key).startsWith("profile-images/").endsWith("photo.png");
+        assertThat(key).doesNotContain("amazonaws.com").doesNotContain("https://");
         verify(s3Client).putObject(any(PutObjectRequest.class), any(software.amazon.awssdk.core.sync.RequestBody.class));
     }
 
     @Test
-    void delete_ignoresUrlThatIsNotAnS3Url() {
-        s3Uploader.delete("https://evil.example.com/steal-this");
-
-        verify(s3Client, never()).deleteObject(any(DeleteObjectRequest.class));
-    }
-
-    @Test
-    void delete_ignoresNullUrl() {
+    void delete_ignoresNullKey() {
         s3Uploader.delete(null);
 
         verify(s3Client, never()).deleteObject(any(DeleteObjectRequest.class));
     }
 
     @Test
-    void delete_extractsKeyFromValidS3Url() {
-        s3Uploader.delete("https://albam-test-bucket.s3.ap-northeast-2.amazonaws.com/profile-images/abc-photo.png");
+    void delete_ignoresBlankKey() {
+        s3Uploader.delete("   ");
+
+        verify(s3Client, never()).deleteObject(any(DeleteObjectRequest.class));
+    }
+
+    @Test
+    void delete_usesTheKeyDirectly() {
+        s3Uploader.delete("profile-images/abc-photo.png");
 
         verify(s3Client).deleteObject(
                 DeleteObjectRequest.builder()
                         .bucket("albam-test-bucket")
                         .key("profile-images/abc-photo.png")
                         .build());
+    }
+
+    @Test
+    void toPublicUrl_buildsUrlFromBucketAndRegion() {
+        String url = s3Uploader.toPublicUrl("profile-images/abc-photo.png");
+
+        assertThat(url)
+                .isEqualTo("https://albam-test-bucket.s3.ap-northeast-2.amazonaws.com/profile-images/abc-photo.png");
+    }
+
+    @Test
+    void toPublicUrl_returnsNullWhenNoImageStored() {
+        assertThat(s3Uploader.toPublicUrl(null)).isNull();
     }
 
     private static byte[] realPngBytes() throws IOException {

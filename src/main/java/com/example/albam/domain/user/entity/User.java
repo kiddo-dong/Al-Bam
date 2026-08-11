@@ -41,7 +41,8 @@ public class User extends BaseTimeEntity {
 
     private LocalDateTime termsAgreedAt;
 
-    private String profileImageUrl;
+    /** 프로필 이미지의 S3 key (전체 URL이 아님). 공개 URL은 응답을 만들 때 조립한다. */
+    private String profileImageKey;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -109,7 +110,7 @@ public class User extends BaseTimeEntity {
         this.password = null;
         this.phone = null;
         this.birthDate = null;
-        this.profileImageUrl = null;
+        this.profileImageKey = null;
         this.providerId = null;
         this.emailVerified = false;
         this.deletedAt = LocalDateTime.now();
@@ -124,7 +125,7 @@ public class User extends BaseTimeEntity {
         this.phone = phone;
     }
 
-    public void changeProfileImageUrl(String profileImageUrl) {
-        this.profileImageUrl = profileImageUrl;
+    public void changeProfileImageKey(String profileImageKey) {
+        this.profileImageKey = profileImageKey;
     }
 }

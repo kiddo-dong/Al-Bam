@@ -15,13 +15,18 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
-/** 프로필/매뉴얼 이미지 전용 업로더. 클라이언트가 보낸 Content-Type을 그대로 신뢰하지 않고,
- * 화이트리스트 검증 + 실제 이미지 디코딩 검증을 거친 뒤에만 S3에 올린다 (위장 파일을 통한 저장형 XSS 방지). */
+/**
+ * 프로필/매뉴얼 이미지 전용 업로더. 클라이언트가 보낸 Content-Type을 그대로 신뢰하지 않고,
+ * 화이트리스트 검증 + 실제 이미지 디코딩 검증을 거친 뒤에만 S3에 올린다 (위장 파일을 통한 저장형 XSS 방지).
+ *
+ * <p>업로드 결과로 전체 URL이 아니라 S3 key만 돌려준다. 버킷·리전·CDN 도메인은 언제든 바뀔 수 있는
+ * 인프라 설정이라, 이를 DB 행마다 복사해두면 옮길 때 저장된 링크가 전부 죽는다. 저장은 key로 하고
+ * 공개 URL은 응답을 만들 때 {@link #toPublicUrl}로 조립한다.
+ */
 @Component
 @RequiredArgsConstructor
 public class S3Uploader {
 
-    private static final String AMAZON_S3_HOST = ".amazonaws.com/";
     private static final Set<String> ALLOWED_IMAGE_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/gif");
 
     private final S3Client s3Client;
@@ -59,22 +64,25 @@ public class S3Uploader {
                         .contentType(contentType)
                         .build(),
                 RequestBody.fromBytes(content));
-        return "https://%s.s3.%s.amazonaws.com/%s".formatted(bucketName, region, key);
+        return key;
     }
 
-    public void delete(String fileUrl) {
-        if (fileUrl == null) {
-            return;
-        }
-        int index = fileUrl.indexOf(AMAZON_S3_HOST);
-        if (index < 0) {
-            // 우리가 관리하는 S3 URL 형식이 아니면 무시한다
+    public void delete(String key) {
+        if (key == null || key.isBlank()) {
             return;
         }
         s3Client.deleteObject(DeleteObjectRequest.builder()
                 .bucket(bucketName)
-                .key(fileUrl.substring(index + AMAZON_S3_HOST.length()))
+                .key(key)
                 .build());
+    }
+
+    /** 저장된 key를 클라이언트가 바로 쓸 수 있는 공개 URL로 만든다. CDN을 붙이면 이 메서드만 바꾸면 된다. */
+    public String toPublicUrl(String key) {
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+        return "https://%s.s3.%s.amazonaws.com/%s".formatted(bucketName, region, key);
     }
 
     private String sanitizeFilename(String originalFilename) {

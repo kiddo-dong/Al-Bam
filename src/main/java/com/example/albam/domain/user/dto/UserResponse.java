@@ -12,8 +12,9 @@ public record UserResponse(
         String profileImageUrl,
         boolean profileCompleted
 ) {
-    public static UserResponse from(User user) {
+    /** profileImageUrl은 저장된 key로부터 조립해 넘겨받는다 (엔티티에는 key만 있다). */
+    public static UserResponse from(User user, String profileImageUrl) {
         return new UserResponse(user.getId(), user.getEmail(), user.getName(), user.getPhone(),
-                user.getBirthDate(), user.getProfileImageUrl(), user.isProfileCompleted());
+                user.getBirthDate(), profileImageUrl, user.isProfileCompleted());
     }
 }

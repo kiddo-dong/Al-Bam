@@ -38,7 +38,12 @@ public class UserService {
     private final PlatformTransactionManager transactionManager;
 
     public UserResponse getMe(Long userId) {
-        return UserResponse.from(getUser(userId));
+        return toResponse(getUser(userId));
+    }
+
+    /** 엔티티에는 S3 key만 있으므로, 응답을 만들 때 공개 URL로 조립한다. */
+    private UserResponse toResponse(User user) {
+        return UserResponse.from(user, s3Uploader.toPublicUrl(user.getProfileImageKey()));
     }
 
     /**
@@ -55,7 +60,7 @@ public class UserService {
             throw new ConflictException("이미 사용 중인 전화번호입니다.");
         }
         user.completeProfile(request.name(), request.phone(), request.birthDate());
-        return UserResponse.from(user);
+        return toResponse(user);
     }
 
     @Transactional
@@ -65,7 +70,7 @@ public class UserService {
         }
         User user = getUser(userId);
         user.updateProfile(request.name(), request.phone());
-        return UserResponse.from(user);
+        return toResponse(user);
     }
 
     /**
@@ -77,10 +82,10 @@ public class UserService {
         if (storeMemberRepository.existsByUserIdAndStatus(userId, MemberStatus.ACTIVE)) {
             throw new ConflictException("소속된 매장이 있으면 탈퇴할 수 없습니다. 매장을 먼저 나가거나 삭제해 주세요.");
         }
-        String[] profileImageUrlHolder = new String[1];
+        String[] profileImageKeyHolder = new String[1];
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             User user = getUser(userId);
-            profileImageUrlHolder[0] = user.getProfileImageUrl();
+            profileImageKeyHolder[0] = user.getProfileImageKey();
             emailTokenRepository.deleteByUserId(userId);
             joinRequestRepository.deleteByUserId(userId);
             // 개인 질문 이력은 민감할 수 있어 탈퇴 시 함께 삭제한다 (메시지 -> 세션 순서, FK 제약)
@@ -88,37 +93,37 @@ public class UserService {
             laborQaSessionRepository.deleteAll(laborQaSessionRepository.findAllByUserId(userId));
             user.anonymizeForWithdrawal();
         });
-        if (profileImageUrlHolder[0] != null) {
-            s3Uploader.delete(profileImageUrlHolder[0]);
+        if (profileImageKeyHolder[0] != null) {
+            s3Uploader.delete(profileImageKeyHolder[0]);
         }
     }
 
     /** S3 업로드/삭제는 네트워크 호출이라 DB 트랜잭션 밖에서 수행한다. */
     public UserResponse updateProfileImage(Long userId, MultipartFile image) {
-        String uploadedUrl = s3Uploader.upload(image, PROFILE_IMAGE_DIRECTORY);
-        String[] previousImageUrlHolder = new String[1];
+        String uploadedKey = s3Uploader.upload(image, PROFILE_IMAGE_DIRECTORY);
+        String[] previousImageKeyHolder = new String[1];
         UserResponse response = new TransactionTemplate(transactionManager).execute(status -> {
             User user = getUser(userId);
-            previousImageUrlHolder[0] = user.getProfileImageUrl();
-            user.changeProfileImageUrl(uploadedUrl);
-            return UserResponse.from(user);
+            previousImageKeyHolder[0] = user.getProfileImageKey();
+            user.changeProfileImageKey(uploadedKey);
+            return toResponse(user);
         });
-        if (previousImageUrlHolder[0] != null) {
-            s3Uploader.delete(previousImageUrlHolder[0]);
+        if (previousImageKeyHolder[0] != null) {
+            s3Uploader.delete(previousImageKeyHolder[0]);
         }
         return response;
     }
 
     public UserResponse deleteProfileImage(Long userId) {
-        String[] previousImageUrlHolder = new String[1];
+        String[] previousImageKeyHolder = new String[1];
         UserResponse response = new TransactionTemplate(transactionManager).execute(status -> {
             User user = getUser(userId);
-            previousImageUrlHolder[0] = user.getProfileImageUrl();
-            user.changeProfileImageUrl(null);
-            return UserResponse.from(user);
+            previousImageKeyHolder[0] = user.getProfileImageKey();
+            user.changeProfileImageKey(null);
+            return toResponse(user);
         });
-        if (previousImageUrlHolder[0] != null) {
-            s3Uploader.delete(previousImageUrlHolder[0]);
+        if (previousImageKeyHolder[0] != null) {
+            s3Uploader.delete(previousImageKeyHolder[0]);
         }
         return response;
     }
