@@ -7,6 +7,7 @@ import com.example.albam.domain.manual.entity.Manual;
 import com.example.albam.domain.manual.repository.ManualRepository;
 import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
+import com.example.albam.global.exception.ForbiddenException;
 import com.example.albam.global.exception.NotFoundException;
 import com.example.albam.global.file.S3Uploader;
 import java.util.ArrayList;
@@ -34,8 +35,33 @@ public class ManualService {
     public ManualResponse createManual(Long storeId, Long userId, ManualRequest request) {
         StoreMember author = storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         Manual manual = manualRepository.save(new Manual(author.getStore(), author, request.category(),
-                request.title(), request.content(), request.displayOrderOrDefault(), request.imageKeys()));
+                request.title(), request.content(), request.displayOrderOrDefault(),
+                verifyImageKeysBelongToStore(storeId, request.imageKeys())));
         return toResponse(manual);
+    }
+
+    /** 이 매장의 이미지 업로드가 쓰는 key 접두사. */
+    private static String imageKeyPrefix(Long storeId) {
+        return MANUAL_IMAGE_DIRECTORY + "/" + storeId + "/";
+    }
+
+    /**
+     * 요청으로 들어온 이미지 key가 이 매장 소유인지 확인한다.
+     *
+     * <p>없으면 다른 매장의 key를 자기 매뉴얼에 넣었다가 빼는 것만으로 그 파일을 S3에서 지울 수 있다
+     * (수정 시 "기존 목록에서 빠진 key"를 삭제하기 때문). 업로드가 매장별 경로에 넣으므로 접두사로 판별한다.
+     */
+    private List<String> verifyImageKeysBelongToStore(Long storeId, List<String> imageKeys) {
+        if (imageKeys == null) {
+            return List.of();
+        }
+        String prefix = imageKeyPrefix(storeId);
+        for (String key : imageKeys) {
+            if (key == null || !key.startsWith(prefix)) {
+                throw new ForbiddenException("이 매장에 업로드된 이미지가 아닙니다.");
+            }
+        }
+        return imageKeys;
     }
 
     public List<ManualSummaryResponse> getManuals(Long storeId, Long userId) {
@@ -55,16 +81,15 @@ public class ManualService {
      * DB 갱신을 먼저 커밋한 뒤, 지워진 이미지는 트랜잭션 밖에서 정리한다.
      */
     public ManualResponse updateManual(Long storeId, Long manualId, Long userId, ManualRequest request) {
+        List<String> keptImageKeys = verifyImageKeysBelongToStore(storeId, request.imageKeys());
         List<String> removedImageKeys = new ArrayList<>();
         ManualResponse response = new TransactionTemplate(transactionManager).execute(status -> {
             storeAuthorizationService.requireOwnerOrManager(storeId, userId);
             Manual manual = getManualInStore(storeId, manualId);
             removedImageKeys.addAll(manual.getImageKeys());
-            if (request.imageKeys() != null) {
-                removedImageKeys.removeAll(request.imageKeys());
-            }
+            removedImageKeys.removeAll(keptImageKeys);
             manual.update(request.category(), request.title(), request.content(),
-                    request.displayOrderOrDefault(), request.imageKeys());
+                    request.displayOrderOrDefault(), keptImageKeys);
             return toResponse(manual);
         });
         removedImageKeys.forEach(s3Uploader::delete);
@@ -82,10 +107,13 @@ public class ManualService {
         images.forEach(s3Uploader::delete);
     }
 
-    /** 매뉴얼 본문에 넣을 이미지를 먼저 업로드하고 S3 key를 돌려받는다. 이 key를 그대로 매뉴얼 저장 요청에 넣는다. */
+    /**
+     * 매뉴얼 본문에 넣을 이미지를 먼저 업로드하고 S3 key를 돌려받는다. 이 key를 그대로 매뉴얼 저장 요청에 넣는다.
+     * 매장별 경로에 넣어야 저장 시 소유권을 접두사로 판별할 수 있다.
+     */
     public String uploadImage(Long storeId, Long userId, MultipartFile image) {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
-        return s3Uploader.upload(image, MANUAL_IMAGE_DIRECTORY);
+        return s3Uploader.upload(image, MANUAL_IMAGE_DIRECTORY + "/" + storeId);
     }
 
     /** 엔티티에는 S3 key만 있으므로, 응답을 만들 때 공개 URL로 조립한다. */
