@@ -6,8 +6,10 @@ import com.example.albam.global.security.JwtAuthenticationFilter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -54,7 +56,27 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
+    /**
+     * Actuator 전용 체인. 아래 기본 체인의 {@code anyRequest().authenticated()}가 관리 포트까지 잡아
+     * 헬스체크조차 JWT를 요구하는 문제가 있어 따로 분리한다.
+     *
+     * <p>여기서 permitAll을 쓸 수 있는 근거는 오직 <b>네트워크 격리</b>다. 관리 포트는
+     * {@code management.server.address=127.0.0.1}로 루프백에만 바인딩되어 외부에서 도달할 수 없다.
+     * 그 설정을 0.0.0.0 등으로 바꾸면 loggers(로그 레벨 변경) 같은 쓰기 기능이 무방비로 열리므로,
+     * 바인딩 주소를 바꿀 때는 반드시 여기에 인증을 함께 붙여야 한다.
+     */
     @Bean
+    @Order(1)
+    public SecurityFilterChain actuatorFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher(EndpointRequest.toAnyEndpoint())
+                .csrf(csrf -> csrf.disable())
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
