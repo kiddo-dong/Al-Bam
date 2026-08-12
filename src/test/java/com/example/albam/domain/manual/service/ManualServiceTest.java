@@ -148,6 +148,29 @@ class ManualServiceTest {
     }
 
     @Test
+    void uploadImage_returnsBothKeyAndUrl() {
+        MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", new byte[] {1});
+        when(s3Uploader.upload(any(), any())).thenReturn(OWN_KEY);
+
+        var uploaded = manualService.uploadImage(STORE_ID, USER_ID, file);
+
+        // key는 저장 요청에 되돌려주기 위해, url은 방금 올린 이미지를 미리 보여주기 위해 둘 다 필요하다.
+        assertThat(uploaded.key()).isEqualTo(OWN_KEY);
+        assertThat(uploaded.url()).isEqualTo("https://bucket/" + OWN_KEY);
+    }
+
+    @Test
+    void manualResponse_carriesKeyAndUrlForEachImage() {
+        var response = manualService.getManual(STORE_ID, MANUAL_ID, USER_ID);
+
+        // 수정 화면은 되돌려줄 key와 미리보기용 url이 모두 있어야 동작한다.
+        assertThat(response.images()).singleElement().satisfies(image -> {
+            assertThat(image.key()).isEqualTo(OWN_KEY);
+            assertThat(image.url()).isEqualTo("https://bucket/" + OWN_KEY);
+        });
+    }
+
+    @Test
     void imageKeyOfOneStoreIsNotAPrefixMatchForAnother() {
         // manual-images/1/ 과 manual-images/12/ 를 혼동하지 않는지 (접두사 검사의 흔한 함정).
         ManualRequest request = new ManualRequest("조리", "제목", "내용", 0,

@@ -1,5 +1,6 @@
 package com.example.albam.domain.manual.controller;
 
+import com.example.albam.domain.manual.dto.ManualImageResponse;
 import com.example.albam.domain.manual.dto.ManualRequest;
 import com.example.albam.domain.manual.dto.ManualResponse;
 import com.example.albam.domain.manual.dto.ManualSummaryResponse;
@@ -64,9 +65,9 @@ public class ManualController {
         return ApiResponse.ok();
     }
 
-    /** 매뉴얼용 이미지 업로드 → URL 반환. 본문 작성 전에 먼저 올리고 imageUrls에 담는다. */
+    /** 매뉴얼용 이미지 업로드 → key와 표시용 url 반환. key를 저장 요청의 imageKeys에 담는다. */
     @PostMapping("/images")
-    public ApiResponse<String> uploadImage(@PathVariable Long storeId, @CurrentUserId Long userId,
+    public ApiResponse<ManualImageResponse> uploadImage(@PathVariable Long storeId, @CurrentUserId Long userId,
             @RequestParam("image") MultipartFile image) {
         return ApiResponse.success(manualService.uploadImage(storeId, userId, image));
     }

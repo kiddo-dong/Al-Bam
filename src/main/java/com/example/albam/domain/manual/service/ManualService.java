@@ -1,5 +1,6 @@
 package com.example.albam.domain.manual.service;
 
+import com.example.albam.domain.manual.dto.ManualImageResponse;
 import com.example.albam.domain.manual.dto.ManualRequest;
 import com.example.albam.domain.manual.dto.ManualResponse;
 import com.example.albam.domain.manual.dto.ManualSummaryResponse;
@@ -111,16 +112,20 @@ public class ManualService {
      * 매뉴얼 본문에 넣을 이미지를 먼저 업로드하고 S3 key를 돌려받는다. 이 key를 그대로 매뉴얼 저장 요청에 넣는다.
      * 매장별 경로에 넣어야 저장 시 소유권을 접두사로 판별할 수 있다.
      */
-    public String uploadImage(Long storeId, Long userId, MultipartFile image) {
+    public ManualImageResponse uploadImage(Long storeId, Long userId, MultipartFile image) {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
-        return s3Uploader.upload(image, MANUAL_IMAGE_DIRECTORY + "/" + storeId);
+        return toImageResponse(s3Uploader.upload(image, MANUAL_IMAGE_DIRECTORY + "/" + storeId));
     }
 
-    /** 엔티티에는 S3 key만 있으므로, 응답을 만들 때 공개 URL로 조립한다. */
+    /** 엔티티에는 S3 key만 있으므로, 응답을 만들 때 공개 URL을 조립해 key와 함께 내려준다. */
     private ManualResponse toResponse(Manual manual) {
         return ManualResponse.from(manual, manual.getImageKeys().stream()
-                .map(s3Uploader::toPublicUrl)
+                .map(this::toImageResponse)
                 .toList());
+    }
+
+    private ManualImageResponse toImageResponse(String key) {
+        return new ManualImageResponse(key, s3Uploader.toPublicUrl(key));
     }
 
     private Manual getManualInStore(Long storeId, Long manualId) {
