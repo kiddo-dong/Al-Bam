@@ -35,3 +35,6 @@ build/
 ### Logs ###
 logs/
 *.log
+
+### 배포 시크릿 ###
+albam.env
