@@ -22,7 +22,7 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Component;
 
 /**
- * {@code src/main/resources/labor-docs/} 아래 PDF·JSON 문서를 읽어 벡터 저장소(S3 Vectors)에 적재한다.
+ * {@code src/main/resources/labor-docs/} 아래 PDF·JSON 문서를 읽어 벡터 저장소(PostgreSQL/pgvector)에 적재한다.
  *
  * <p>기동할 때마다 자동 적재하지 않는다. 저장소가 영속이라 재기동마다 넣으면 같은 내용이 쌓이고,
  * 청크가 늘어날수록 기동이 임베딩 API 호출에 묶여 느려지고 실패 지점도 늘기 때문이다. 대신 지식베이스를

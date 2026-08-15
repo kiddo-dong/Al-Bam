@@ -44,7 +44,7 @@ public class LaborQaService {
             """;
 
     /**
-     * {@link VectorStore}를 생성자에서 직접 주입받지 않고 {@link ObjectProvider}로 감싸는 이유: S3 Vectors
+     * {@link VectorStore}를 생성자에서 직접 주입받지 않고 {@link ObjectProvider}로 감싸는 이유: pgvector
      * 연결은 이 벡터스토어 빈이 실제로 처음 만들어질 때 이루어지는데, 생성자 주입이면 이 서비스가 만들어지는
      * 시점에 즉시 그 연결을 시도하게 되어 AiConfig의 {@code @Lazy}가 무력화된다. {@link #ask}가 실제로
      * 호출될 때만 {@code getObject()}로 지연 조회하도록 한다.
