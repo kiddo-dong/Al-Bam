@@ -9,6 +9,24 @@ BASE_URL="http://localhost:8080"
 TOKEN="$1"
 ADMIN_TOKEN="$2"
 
+# 긴 토큰을 붙여넣다 터미널에서 줄이 접히면 인자가 잘려 전부 401이 된다.
+# 그 상태로 끝까지 실행하면 원인이 안 보이므로 여기서 멈춘다.
+if [ -z "$TOKEN" ]; then
+  echo "accessToken이 비었다. 토큰을 직접 붙여넣지 말고 아래처럼 셸 변수로 받아 쓰는 편이 안전하다:"
+  echo ""
+  echo '  TOKEN=$(curl -s -X POST -H "Content-Type: application/json" \'
+  echo '    -d "{\"email\":\"test@albam.dev\",\"password\":\"Test1234!\"}" \'
+  echo '    http://localhost:8080/api/v1/auth/login | python3 -c "import sys,json;print(json.load(sys.stdin)[\"data\"][\"accessToken\"])")'
+  echo ""
+  echo "  $0 \"\$TOKEN\" {adminIngestToken}"
+  exit 1
+fi
+
+if [ -z "$ADMIN_TOKEN" ]; then
+  echo "(adminIngestToken이 없어 0번 적재는 건너뛴다. 지식베이스가 비어 있으면 질문에 답할 근거가 없다.)"
+  echo ""
+fi
+
 if [ -n "$ADMIN_TOKEN" ]; then
   echo "== 0. 지식베이스 적재 (관리자) =="
   echo "   청크 ID가 내용 기반이라 여러 번 불러도 중복되지 않고 덮어쓴다."
