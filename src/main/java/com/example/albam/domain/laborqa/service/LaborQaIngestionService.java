@@ -3,12 +3,10 @@ package com.example.albam.domain.laborqa.service;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
@@ -63,19 +61,15 @@ public class LaborQaIngestionService {
         return chunks.size();
     }
 
-    /** 내용이 같으면 항상 같은 ID가 나오도록 해시로 대체한다 (재적재 시 덮어쓰기 → 중복 방지). */
+    /**
+     * 내용이 같으면 항상 같은 ID가 나오도록 내용에서 ID를 유도한다 (재적재 시 덮어쓰기 → 중복 방지).
+     *
+     * <p>pgvector의 id 컬럼이 uuid 타입이라 임의의 해시 문자열은 넣을 수 없다. 그래서 해시를 그대로
+     * 쓰지 않고 내용으로부터 UUID를 만든다 — 결정적이면서 형식도 만족한다.
+     */
     private static Document withStableId(Document chunk) {
-        return new Document(sha256(chunk.getText()), chunk.getText(), chunk.getMetadata());
-    }
-
-    private static String sha256(String text) {
-        try {
-            byte[] hash = MessageDigest.getInstance("SHA-256")
-                    .digest(text.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256을 사용할 수 없습니다.", e);
-        }
+        String id = UUID.nameUUIDFromBytes(chunk.getText().getBytes(StandardCharsets.UTF_8)).toString();
+        return new Document(id, chunk.getText(), chunk.getMetadata());
     }
 
     private List<Document> readPdfs() {
