@@ -84,6 +84,10 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
+                        // 지식베이스는 매장이 아닌 서비스 전역 자원이라 매장 역할로 보호할 수 없다.
+                        // 대신 컨트롤러가 X-Admin-Token을 직접 검사하므로 여기서는 통과시킨다.
+                        // 주의: 와일드카드라 이 경로 아래 엔드포인트를 새로 추가하면 인증 없이 열린다.
+                        // 추가할 때는 반드시 컨트롤러에서 토큰 검증을 함께 넣을 것.
                         .requestMatchers("/api/v1/labor-qa/admin/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
