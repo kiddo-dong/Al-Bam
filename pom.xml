@@ -158,6 +158,22 @@
 	</dependencyManagement>
 
 	<build>
+		<!--
+			src/main/resources/http/ 의 curl 스크립트는 개발용 도구다. 프로젝트 컨벤션상 위치는
+			그대로 두되, 배포 아티팩트에까지 실릴 이유는 없으므로 패키징에서만 뺀다.
+
+			이 블록을 두면 부모 POM의 기본 리소스 설정을 덮어써서 application.properties의
+			Maven 필터링(@...@)이 꺼진다. 현재 그 문법을 쓰는 곳이 없어 문제가 없지만,
+			나중에 @project.version@ 같은 걸 넣으려면 filtering 설정을 여기에 되살려야 한다.
+		-->
+		<resources>
+			<resource>
+				<directory>src/main/resources</directory>
+				<excludes>
+					<exclude>http/**</exclude>
+				</excludes>
+			</resource>
+		</resources>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
