@@ -24,8 +24,10 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -37,6 +39,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -229,11 +232,36 @@ public class AuthService {
         if (!jwtTokenProvider.validateToken(refreshToken) || !jwtTokenProvider.isRefreshToken(refreshToken)) {
             throw new InvalidRequestException("유효하지 않은 리프레시 토큰입니다.");
         }
-        RefreshToken stored = refreshTokenRepository.findByTokenHash(hashToken(refreshToken))
-                .orElseThrow(() -> new InvalidRequestException("만료되었거나 이미 사용된 로그인 정보입니다. 다시 로그인해 주세요."));
+        Optional<RefreshToken> stored = refreshTokenRepository.findByTokenHash(hashToken(refreshToken));
+        if (stored.isEmpty()) {
+            revokeAllSessionsAfterReuse(refreshToken);
+            throw new InvalidRequestException("만료되었거나 이미 사용된 로그인 정보입니다. 다시 로그인해 주세요.");
+        }
 
-        refreshTokenRepository.delete(stored);
-        return issueTokens(stored.getUser());
+        refreshTokenRepository.delete(stored.get());
+        return issueTokens(stored.get().getUser());
+    }
+
+    /**
+     * 서명은 멀쩡한데 기록이 없는 토큰이 들어왔다는 것은, 이미 회전으로 소비됐거나 폐기된 토큰을 누군가
+     * 다시 쓰고 있다는 뜻이다. 정상 클라이언트는 새 토큰을 받았으므로 옛 것을 쓸 이유가 없다. 유출됐을
+     * 가능성이 있다고 보고 그 사용자의 세션을 전부 끊어, 탈취자가 다른 토큰으로 갈아타지 못하게 한다.
+     *
+     * <p>탭 두 개가 동시에 갱신하면 늦은 쪽이 여기에 걸려 멀쩡한 사용자도 로그아웃될 수 있다. 그때
+     * 이유를 알 수 있도록 경고를 남긴다. 오탐이 잦다면 소비된 토큰에 짧은 유예를 두는 방식이 대안이다.
+     */
+    private void revokeAllSessionsAfterReuse(String refreshToken) {
+        Long userId;
+        try {
+            userId = jwtTokenProvider.getUserId(refreshToken);
+        } catch (RuntimeException e) {
+            return;
+        }
+        long revoked = refreshTokenRepository.deleteByUserId(userId);
+        if (revoked > 0) {
+            log.warn("이미 사용된 리프레시 토큰이 다시 들어와 userId={}의 세션 {}건을 폐기했다. "
+                    + "토큰 유출이거나, 여러 탭이 동시에 갱신을 시도한 경우다.", userId, revoked);
+        }
     }
 
     /**

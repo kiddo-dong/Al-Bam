@@ -103,10 +103,40 @@ class AuthServiceRefreshTokenTest {
     void refreshIsRejectedWhenTheTokenWasRevoked() {
         givenTokenIsStructurallyValid();
         when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.empty());
+        when(jwtTokenProvider.getUserId(PRESENTED_TOKEN)).thenReturn(user.getId());
 
         assertThatThrownBy(() -> authService.refresh(PRESENTED_TOKEN))
                 .isInstanceOf(InvalidRequestException.class);
         verify(jwtTokenProvider, never()).createAccessToken(any(), anyString());
+    }
+
+    /**
+     * 소비된 토큰이 다시 들어오면 유출 신호로 보고 그 사용자의 세션을 전부 끊는다. 그러지 않으면
+     * 탈취자가 훔친 토큰으로 받아둔 다른 토큰으로 계속 갈아탈 수 있다.
+     */
+    @Test
+    void refreshRevokesEverySessionWhenAConsumedTokenComesBack() {
+        givenTokenIsStructurallyValid();
+        when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.empty());
+        when(jwtTokenProvider.getUserId(PRESENTED_TOKEN)).thenReturn(user.getId());
+
+        assertThatThrownBy(() -> authService.refresh(PRESENTED_TOKEN))
+                .isInstanceOf(InvalidRequestException.class);
+
+        verify(refreshTokenRepository).deleteByUserId(user.getId());
+    }
+
+    /** 정상 재발급까지 세션을 끊어버리면 안 된다. */
+    @Test
+    void refreshLeavesOtherSessionsAloneOnASuccessfulRotation() {
+        givenTokenIsStructurallyValid();
+        givenNewTokensAreIssued();
+        when(refreshTokenRepository.findByTokenHash(anyString()))
+                .thenReturn(Optional.of(new RefreshToken(user, "hash", LocalDateTime.now().plusDays(14))));
+
+        authService.refresh(PRESENTED_TOKEN);
+
+        verify(refreshTokenRepository, never()).deleteByUserId(any());
     }
 
     /** 회전: 쓴 토큰은 지워지므로 같은 토큰으로 두 번 재발급받을 수 없다. */

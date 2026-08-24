@@ -33,20 +33,21 @@ curl -s -b "$COOKIE_JAR" -c "$COOKIE_JAR" -X POST \
   "$BASE_URL/api/v1/auth/refresh" | python3 -m json.tool
 
 echo ""
-echo "== 4. 같은 토큰으로 또 재발급 -> 회전했으므로 거부돼야 한다 =="
+echo "== 4. 소비된 토큰을 다시 사용 -> 거부되고, 재사용 탐지로 세션이 전부 끊긴다 =="
 curl -s -b "$STOLEN_COOKIES" -X POST \
   "$BASE_URL/api/v1/auth/refresh" | python3 -m json.tool
+echo "   (서버 로그에 '이미 사용된 리프레시 토큰이 다시 들어와...' 경고가 남는다)"
 
 echo ""
-echo "== 5. 로그아웃 =="
-curl -s -b "$COOKIE_JAR" -X POST "$BASE_URL/api/v1/auth/logout" | python3 -m json.tool
-
-echo ""
-echo "== 6. 로그아웃한 토큰으로 재발급 -> 거부돼야 한다 (이게 이번 변경의 핵심) =="
+echo "== 5. 3번에서 받은 정상 토큰도 이제 무효다 (4번이 전부 끊었으므로) =="
 curl -s -b "$COOKIE_JAR" -X POST \
   "$BASE_URL/api/v1/auth/refresh" | python3 -m json.tool
 
+echo ""
+echo "== 6. 로그아웃 (이미 세션이 없어도 성공해야 한다) =="
+curl -s -b "$COOKIE_JAR" -X POST "$BASE_URL/api/v1/auth/logout" | python3 -m json.tool
+
 rm -f "$STOLEN_COOKIES"
 echo ""
-echo "== 7. 저장된 토큰 확인 =="
+echo "== 7. 저장된 토큰 확인 (재사용 탐지가 돌았다면 비어 있다) =="
 echo "   mysql -u root -p al-bam -e \"SELECT id, user_id, LEFT(token_hash,16) AS hash, expires_at FROM refresh_tokens;\""
