@@ -89,6 +89,10 @@ public class SecurityConfig {
                         // 주의: 와일드카드라 이 경로 아래 엔드포인트를 새로 추가하면 인증 없이 열린다.
                         // 추가할 때는 반드시 컨트롤러에서 토큰 검증을 함께 넣을 것.
                         .requestMatchers("/api/v1/labor-qa/admin/**").permitAll()
+                        // 문서를 실제로 막는 것은 이 줄이 아니라 springdoc.api-docs.enabled이다(기본 false).
+                        // 꺼져 있으면 핸들러 자체가 없어 404가 되고, 여기 permitAll은 로컬에서
+                        // SWAGGER_ENABLED=true로 켰을 때 로그인 없이 열어 보기 위한 것이다.
+                        // 배포에서 문서를 켤 일이 생기면 이 줄부터 인증으로 바꿔야 한다.
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
                 )
