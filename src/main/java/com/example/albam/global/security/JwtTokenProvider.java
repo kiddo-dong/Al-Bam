@@ -5,6 +5,8 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Date;
 import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
@@ -62,6 +64,13 @@ public class JwtTokenProvider {
 
     public boolean isRefreshToken(String token) {
         return TOKEN_TYPE_REFRESH.equals(getClaims(token).get(CLAIM_TOKEN_TYPE, String.class));
+    }
+
+    /**
+     * 토큰에 적힌 만료 시각. 리프레시 토큰을 DB에 기록할 때 행의 만료를 토큰과 정확히 일치시키는 데 쓴다.
+     */
+    public LocalDateTime getExpiresAt(String token) {
+        return LocalDateTime.ofInstant(getClaims(token).getExpiration().toInstant(), ZoneId.systemDefault());
     }
 
     public Long getUserId(String token) {

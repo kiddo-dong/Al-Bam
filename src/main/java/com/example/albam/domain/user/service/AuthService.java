@@ -7,16 +7,22 @@ import com.example.albam.domain.user.dto.IssuedTokens;
 import com.example.albam.domain.user.entity.AuthProvider;
 import com.example.albam.domain.user.entity.EmailToken;
 import com.example.albam.domain.user.entity.EmailTokenType;
+import com.example.albam.domain.user.entity.RefreshToken;
 import com.example.albam.domain.user.entity.User;
 import com.example.albam.domain.user.oauth.OAuthUserInfo;
 import com.example.albam.domain.user.oauth.OAuthUserInfoFetcher;
 import com.example.albam.domain.user.repository.EmailTokenRepository;
+import com.example.albam.domain.user.repository.RefreshTokenRepository;
 import com.example.albam.domain.user.repository.UserRepository;
 import com.example.albam.global.exception.ConflictException;
 import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.mail.MailService;
 import com.example.albam.global.security.JwtTokenProvider;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +47,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final EmailTokenRepository emailTokenRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
@@ -158,6 +165,8 @@ public class AuthService {
         }
         emailToken.getUser().changePassword(passwordEncoder.encode(request.newPassword()));
         emailToken.markUsed();
+        // 비밀번호를 바꾸는 이유 중 하나가 계정 탈취이므로, 기존 로그인 세션을 전부 끊는다.
+        refreshTokenRepository.deleteByUserId(emailToken.getUser().getId());
     }
 
     private void validatePasswordComplexity(String password) {
@@ -170,6 +179,7 @@ public class AuthService {
         }
     }
 
+    @Transactional
     public IssuedTokens login(LoginRequest request) {
         // 비밀번호 오류와 동일한 401 응답을 내려 계정 존재 여부를 노출하지 않는다
         User user = userRepository.findByEmail(request.email())
@@ -208,18 +218,55 @@ public class AuthService {
                 .orElseThrow(() -> new InvalidRequestException("지원하지 않는 로그인 방식입니다."));
     }
 
+    /**
+     * 리프레시 토큰을 새 토큰 쌍으로 교환한다. 서명·만료뿐 아니라 저장된 기록이 있는지도 확인하므로,
+     * 로그아웃이나 비밀번호 변경으로 지워진 토큰은 아직 만료 전이어도 거부된다.
+     *
+     * <p>쓴 토큰은 지우고 새로 발급한다(회전). 한 토큰이 계속 재사용되지 않으므로 유출이 오래 유효하지 않다.
+     */
+    @Transactional
     public IssuedTokens refresh(String refreshToken) {
         if (!jwtTokenProvider.validateToken(refreshToken) || !jwtTokenProvider.isRefreshToken(refreshToken)) {
             throw new InvalidRequestException("유효하지 않은 리프레시 토큰입니다.");
         }
-        User user = userRepository.findById(jwtTokenProvider.getUserId(refreshToken))
-                .orElseThrow(() -> new InvalidRequestException("유효하지 않은 리프레시 토큰입니다."));
-        return issueTokens(user);
+        RefreshToken stored = refreshTokenRepository.findByTokenHash(hashToken(refreshToken))
+                .orElseThrow(() -> new InvalidRequestException("만료되었거나 이미 사용된 로그인 정보입니다. 다시 로그인해 주세요."));
+
+        refreshTokenRepository.delete(stored);
+        return issueTokens(stored.getUser());
+    }
+
+    /**
+     * 이 토큰 하나만 폐기한다. 다른 기기의 로그인은 각자의 토큰을 갖고 있으므로 그대로 유지된다.
+     * 이미 없는 토큰이어도 조용히 넘어간다 — 로그아웃은 몇 번을 눌러도 성공해야 한다.
+     */
+    @Transactional
+    public void logout(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return;
+        }
+        refreshTokenRepository.findByTokenHash(hashToken(refreshToken))
+                .ifPresent(refreshTokenRepository::delete);
     }
 
     private IssuedTokens issueTokens(User user) {
         String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getEmail());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId(), user.getEmail());
+        refreshTokenRepository.save(new RefreshToken(user, hashToken(refreshToken),
+                jwtTokenProvider.getExpiresAt(refreshToken)));
         return new IssuedTokens(accessToken, refreshToken, user.isProfileCompleted());
+    }
+
+    /**
+     * 토큰 원문 대신 해시를 저장·조회한다. DB가 유출돼도 그대로 쓸 수 있는 토큰이 함께 넘어가지 않는다.
+     * 토큰은 서명된 JWT라 추측할 수 없으므로 비밀번호와 달리 솔트·반복 해싱은 필요 없다.
+     */
+    private String hashToken(String token) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256을 사용할 수 없습니다.", e);
+        }
     }
 }

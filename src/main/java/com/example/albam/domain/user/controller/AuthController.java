@@ -68,9 +68,15 @@ public class AuthController {
         return tokenResponseWithCookie(authService.refresh(refreshToken));
     }
 
-    /** 리프레시 토큰 쿠키를 즉시 만료시킨다. 액세스 토큰은 클라이언트가 버리면 된다(짧은 만료로 자연 소멸). */
+    /**
+     * 서버에 저장된 리프레시 토큰을 폐기하고 쿠키도 만료시킨다. 쿠키만 지우면 토큰 자체는 살아 있어
+     * 값을 미리 복사해 둔 쪽이 계속 재발급을 받을 수 있으므로, 서버 기록을 지우는 쪽이 실제 로그아웃이다.
+     * 액세스 토큰은 별도 폐기 수단이 없고 15분이면 만료되므로 클라이언트가 버리면 된다.
+     */
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout() {
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @CookieValue(value = REFRESH_COOKIE_NAME, required = false) String refreshToken) {
+        authService.logout(refreshToken);
         ResponseCookie expiredCookie = refreshCookieBuilder("").maxAge(Duration.ZERO).build();
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, expiredCookie.toString())
