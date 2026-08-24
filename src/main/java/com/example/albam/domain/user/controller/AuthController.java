@@ -12,6 +12,7 @@ import com.example.albam.domain.user.service.AuthService;
 import com.example.albam.global.common.ApiResponse;
 import com.example.albam.global.exception.InvalidRequestException;
 import jakarta.validation.Valid;
+import java.net.URI;
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,6 +46,9 @@ public class AuthController {
     /** 로컬 개발(http)에서는 false, 배포(https)에서는 true로 설정해야 쿠키가 전송된다. */
     @Value("${app.cookie-secure:false}")
     private boolean cookieSecure;
+
+    @Value("${app.frontend-url}")
+    private String frontendUrl;
 
     @PostMapping("/signup")
     public ResponseEntity<ApiResponse<Long>> signup(@Valid @RequestBody SignupRequest request) {
@@ -90,10 +94,25 @@ public class AuthController {
         return tokenResponseWithCookie(authService.oauthLogin(authProvider, request.accessToken()));
     }
 
+    /**
+     * 메일의 인증 링크가 향하는 곳. 사용자가 브라우저로 직접 여는 유일한 API라서, 응답 JSON을
+     * 그대로 보여주는 대신 결과만 붙여 프론트 로그인 화면으로 넘긴다.
+     *
+     * <p>만료되거나 이미 쓴 링크도 에러 응답으로 끊지 않는다. 사용자는 안내 화면을 봐야 하는데
+     * 그건 프론트가 할 일이기 때문이다.
+     */
     @GetMapping("/verify-email")
-    public ApiResponse<String> verifyEmail(@RequestParam String token) {
-        authService.verifyEmail(token);
-        return ApiResponse.success("이메일 인증이 완료되었습니다. 이제 로그인할 수 있습니다.");
+    public ResponseEntity<Void> verifyEmail(@RequestParam String token) {
+        String result;
+        try {
+            authService.verifyEmail(token);
+            result = "success";
+        } catch (InvalidRequestException e) {
+            result = "invalid";
+        }
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create(frontendUrl + "/login?verified=" + result))
+                .build();
     }
 
     @PostMapping("/resend-verification")

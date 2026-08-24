@@ -61,6 +61,10 @@ public class AuthService {
     @Value("${app.base-url}")
     private String baseUrl;
 
+    /** 메일 링크가 향할 사용자용 주소. baseUrl은 API 주소라 사용자가 직접 열 화면이 없다. */
+    @Value("${app.frontend-url}")
+    private String frontendUrl;
+
     /**
      * 메일 발송(SMTP)은 트랜잭션 밖에서 한다 — DB 커밋까지 커넥션을 붙잡지 않기 위함이자,
      * 메일 서버 장애로 이미 커밋된 가입을 롤백시키지 않기 위함. 인증 메일은 재발송 API로 복구 가능하다.
@@ -93,10 +97,14 @@ public class AuthService {
         return new VerificationMail(user.getId(), user.getEmail(), user.getName(), token.getToken());
     }
 
+    /**
+     * 인증 링크는 API를 가리킨다 — 토큰 처리는 서버가 하고, 끝나면 사용자를 프론트 화면으로 넘긴다.
+     * 토큰이 브라우저 JS까지 갈 이유가 없으므로 이 방향이 더 안전하다.
+     */
     private void sendVerificationMail(VerificationMail mail) {
         String link = baseUrl + "/api/v1/auth/verify-email?token=" + mail.token();
-        mailService.send(mail.email(), "[알밤] 이메일 인증을 완료해 주세요",
-                mail.name() + "님, 알밤 가입을 환영합니다!\n\n"
+        mailService.send(mail.email(), "[ToTheWork] 이메일 인증을 완료해 주세요",
+                mail.name() + "님, ToTheWork 가입을 환영합니다!\n\n"
                         + "아래 링크를 클릭해 이메일 인증을 완료해 주세요. (24시간 이내)\n" + link);
     }
 
@@ -146,11 +154,11 @@ public class AuthService {
         if (mail == null) {
             return;
         }
-        mailService.send(mail.email(), "[알밤] 비밀번호 재설정 안내",
+        // 재설정 폼은 프론트 화면이다. 예전에는 API 주소를 안내해서, 눌러도 405만 보였다.
+        String link = frontendUrl + "/password-reset/confirm?token=" + mail.token();
+        mailService.send(mail.email(), "[ToTheWork] 비밀번호 재설정 안내",
                 mail.name() + "님, 비밀번호 재설정 요청이 접수되었습니다.\n\n"
-                        + "아래 토큰으로 30분 이내에 새 비밀번호를 설정해 주세요.\n"
-                        + "토큰: " + mail.token() + "\n\n"
-                        + "재설정 주소: " + baseUrl + "/api/v1/auth/password-reset/confirm\n"
+                        + "아래 링크에서 30분 이내에 새 비밀번호를 설정해 주세요.\n" + link + "\n\n"
                         + "본인이 요청하지 않았다면 이 메일을 무시하세요.");
     }
 
