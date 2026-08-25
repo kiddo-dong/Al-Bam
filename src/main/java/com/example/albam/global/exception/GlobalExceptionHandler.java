@@ -23,7 +23,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException e) {
         return ResponseEntity.status(e.getErrorCode().getStatus())
-                .body(ApiResponse.error(e.getMessage()));
+                .body(ApiResponse.error(e.getMessage(), e.getErrorCode().name()));
     }
 
     @ExceptionHandler(BadCredentialsException.class)

@@ -10,11 +10,12 @@ public record UserResponse(
         String phone,
         LocalDate birthDate,
         String profileImageUrl,
-        boolean profileCompleted
+        boolean profileCompleted,
+        boolean emailVerified
 ) {
     /** profileImageUrl은 저장된 key로부터 조립해 넘겨받는다 (엔티티에는 key만 있다). */
     public static UserResponse from(User user, String profileImageUrl) {
         return new UserResponse(user.getId(), user.getEmail(), user.getName(), user.getPhone(),
-                user.getBirthDate(), profileImageUrl, user.isProfileCompleted());
+                user.getBirthDate(), profileImageUrl, user.isProfileCompleted(), user.isEmailVerified());
     }
 }

@@ -15,6 +15,7 @@ import com.example.albam.domain.user.repository.EmailTokenRepository;
 import com.example.albam.domain.user.repository.RefreshTokenRepository;
 import com.example.albam.domain.user.repository.UserRepository;
 import com.example.albam.global.exception.ConflictException;
+import com.example.albam.global.exception.EmailNotVerifiedException;
 import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.mail.MailService;
 import com.example.albam.global.security.JwtTokenProvider;
@@ -76,8 +77,9 @@ public class AuthService {
         }
         validatePasswordComplexity(request.password());
         VerificationMail mail = new TransactionTemplate(transactionManager).execute(status -> {
-            if (userRepository.existsByEmail(request.email())) {
-                throw new ConflictException("이미 가입된 이메일입니다.");
+            User existing = userRepository.findByEmail(request.email()).orElse(null);
+            if (existing != null) {
+                return resubmitSignup(existing, request);
             }
             if (userRepository.existsByPhone(request.phone())) {
                 throw new ConflictException("이미 가입된 전화번호입니다.");
@@ -89,6 +91,30 @@ public class AuthService {
         });
         sendVerificationMail(mail);
         return mail.userId();
+    }
+
+    /**
+     * 이미 그 이메일로 행이 있을 때의 처리.
+     *
+     * <p>인증을 마치지 않은 로컬 계정이라면 가입이 끝나지 않은 것이므로 새 입력으로 덮어쓰고 인증
+     * 메일을 다시 보낸다. 이게 없으면 메일을 열지 않은 채 잊었거나 주소를 잘못 적은 사람에게
+     * "이미 가입된 이메일입니다"만 돌아가고, 로그인도 막혀 있어(인증 전) 그 주소로는 영영 가입할 수
+     * 없게 된다.
+     *
+     * <p>인증을 마쳤거나 소셜로 가입한 계정은 실제 소유자가 있으므로 그대로 거절한다.
+     */
+    private VerificationMail resubmitSignup(User existing, SignupRequest request) {
+        if (existing.isEmailVerified() || existing.getProvider() != AuthProvider.LOCAL) {
+            throw new ConflictException("이미 가입된 이메일입니다.");
+        }
+        if (userRepository.existsByPhoneAndIdNot(request.phone(), existing.getId())) {
+            throw new ConflictException("이미 가입된 전화번호입니다.");
+        }
+        existing.resubmitSignup(passwordEncoder.encode(request.password()), request.name(),
+                request.phone(), request.birthDate());
+        // 앞서 보낸 인증 링크는 더 이상 유효하면 안 된다. 옛 메일이 남아 있어도 새 메일만 통한다.
+        emailTokenRepository.deleteByUserId(existing.getId());
+        return prepareVerificationMail(existing);
     }
 
     private VerificationMail prepareVerificationMail(User user) {
@@ -202,7 +228,9 @@ public class AuthService {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.email(), request.password()));
         if (!user.isEmailVerified()) {
-            throw new InvalidRequestException("이메일 인증이 완료되지 않았습니다. 메일함을 확인해 주세요.");
+            // 비밀번호는 맞았고 남은 것은 인증뿐이라, 프론트가 재발송 안내를 띄울 수 있도록
+            // 일반적인 요청 오류와 다른 코드로 구분해 보낸다.
+            throw new EmailNotVerifiedException("이메일 인증이 완료되지 않았습니다. 메일함을 확인해 주세요.");
         }
         return issueTokens(user);
     }

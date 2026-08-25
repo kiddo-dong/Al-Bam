@@ -78,6 +78,21 @@ public class User extends BaseTimeEntity {
         this.emailVerified = true;
     }
 
+    /**
+     * 인증을 마치지 않은 로컬 계정에 같은 이메일로 다시 가입할 때, 기존 행을 새 입력으로 덮어쓴다.
+     *
+     * <p>새 행을 만드는 대신 덮어쓰는 이유는 이메일이 unique이기 때문이다. 인증 전 계정은 소유자가
+     * 증명된 적이 없어(메일함 접근을 보인 적이 없다) 이렇게 덮어써도 남의 계정을 건드리는 것이
+     * 아니다. 덮어써도 여전히 인증을 통과해야 로그인할 수 있으므로 가로채기에도 쓰이지 않는다.
+     */
+    public void resubmitSignup(String password, String name, String phone, LocalDate birthDate) {
+        this.password = password;
+        this.name = name;
+        this.phone = phone;
+        this.birthDate = birthDate;
+        this.termsAgreedAt = LocalDateTime.now();
+    }
+
     public void markEmailVerified() {
         this.emailVerified = true;
     }
