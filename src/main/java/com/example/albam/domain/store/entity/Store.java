@@ -24,11 +24,16 @@ import java.util.Set;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 
 @Getter
 @Entity
 @Table(name = "stores")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+// 소프트 삭제된(deleted_at이 채워진) 매장은 일반 조회에서 항상 제외한다. 조회하는 쪽마다 조건을
+// 붙이면 하나라도 빠뜨렸을 때 지운 매장이 다시 노출되므로, 엔티티 레벨에서 한 번에 막는다.
+// 유예기간 정리 배치(StorePurgeService)는 이 필터를 우회해야 하므로 네이티브 쿼리를 쓴다.
+@SQLRestriction("deleted_at IS NULL")
 public class Store extends BaseTimeEntity {
 
     /** 단계 이름은 화면이 정하므로 값 자체는 검사하지 않고, 길이만 제한해 둔다. */
@@ -91,6 +96,12 @@ public class Store extends BaseTimeEntity {
     /** 사장님이 온보딩을 마쳤다고 표시한 시각. 아직이면 null. */
     private LocalDateTime onboardingCompletedAt;
 
+    /**
+     * 삭제 표시 시각. null이 아니면 소프트 삭제된 것이고, {@code @SQLRestriction} 때문에 일반 조회에
+     * 걸리지 않는다. 실제 행은 유예기간이 지난 뒤 {@code StorePurgeService}가 지운다.
+     */
+    private LocalDateTime deletedAt;
+
     public Store(String name, String address, String businessRegistrationNumber, StoreCategory category,
             Map<DayOfWeek, BusinessHour> businessHours, String inviteCode, BreakPolicy breakPolicy,
             Boolean smallBusiness, Integer payday) {
@@ -124,6 +135,13 @@ public class Store extends BaseTimeEntity {
 
     public void changeInviteCode(String inviteCode) {
         this.inviteCode = inviteCode;
+    }
+
+    /** 삭제 표시. 이미 표시되어 있다면 최초 시각을 유지해 반복 호출로 유예기간이 늘어나지 않게 한다. */
+    public void softDelete() {
+        if (this.deletedAt == null) {
+            this.deletedAt = LocalDateTime.now();
+        }
     }
 
     public void update(String name, String address, String businessRegistrationNumber, StoreCategory category,

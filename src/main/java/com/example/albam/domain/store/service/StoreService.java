@@ -116,7 +116,13 @@ public class StoreService {
         owner.changeRole(MemberRole.MANAGER);
     }
 
-    /** 매장 삭제는 되돌릴 수 없으므로, 실수 방지를 위해 매장 이름을 정확히 입력해야 실행된다. */
+    /**
+     * 매장을 소프트 삭제한다. 실수 방지를 위해 매장 이름을 정확히 입력해야 실행된다.
+     *
+     * <p>즉시 완전히 지우지는 않는다 — 근태·급여 기록까지 그 자리에서 함께 사라지면 되돌릴 방법이
+     * 없기 때문이다. 유예기간(90일) 동안은 화면에서 안 보이지만 DB에는 남아있고, 그 뒤
+     * {@code StorePurgeService}가 실제로 지운다.
+     */
     @Transactional
     public void deleteStore(Long storeId, Long userId, String confirmName) {
         storeAuthorizationService.requireOwner(storeId, userId);
@@ -125,7 +131,7 @@ public class StoreService {
             throw new InvalidRequestException(
                     "매장 이름이 일치하지 않습니다. 삭제하려면 매장 이름(" + store.getName() + ")을 정확히 입력해 주세요.");
         }
-        storeRepository.delete(store);
+        store.softDelete();
     }
 
     private Store getStoreEntity(Long storeId) {
