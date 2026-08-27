@@ -16,8 +16,11 @@ import jakarta.persistence.MapKeyColumn;
 import jakarta.persistence.MapKeyEnumerated;
 import jakarta.persistence.Table;
 import java.time.DayOfWeek;
+import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,6 +30,9 @@ import lombok.NoArgsConstructor;
 @Table(name = "stores")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Store extends BaseTimeEntity {
+
+    /** 단계 이름은 화면이 정하므로 값 자체는 검사하지 않고, 길이만 제한해 둔다. */
+    public static final int ONBOARDING_STEP_KEY_MAX_LENGTH = 40;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -67,6 +73,24 @@ public class Store extends BaseTimeEntity {
      */
     private Integer payday;
 
+    /**
+     * 사장님이 실제로 보고 확인한 온보딩 단계들.
+     *
+     * <p>"데이터가 있으면 완료"로만 판단하면, 매장을 만들 때 업종 프리셋으로 채워 넣은 영업시간·
+     * 체크리스트 때문에 아무것도 안 한 매장이 이미 절반 넘게 끝난 것처럼 보인다. 그 내용이 이 매장에
+     * 맞는지는 아직 아무도 안 봤는데도 그렇다. 그래서 데이터 유무와 별개로 확인 여부를 따로 남긴다.
+     *
+     * <p>단계 이름을 enum이 아니라 문자열로 두는 이유는 프리셋과 같다 — 어떤 단계를 보여줄지는
+     * 화면의 사정이라, 단계를 하나 넣고 빼는 데 서버 배포가 필요하지 않게 한다.
+     */
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "store_onboarding_steps", joinColumns = @JoinColumn(name = "store_id"))
+    @Column(name = "step_key", nullable = false, length = ONBOARDING_STEP_KEY_MAX_LENGTH)
+    private Set<String> confirmedOnboardingSteps = new HashSet<>();
+
+    /** 사장님이 온보딩을 마쳤다고 표시한 시각. 아직이면 null. */
+    private LocalDateTime onboardingCompletedAt;
+
     public Store(String name, String address, String businessRegistrationNumber, StoreCategory category,
             Map<DayOfWeek, BusinessHour> businessHours, String inviteCode, BreakPolicy breakPolicy,
             Boolean smallBusiness, Integer payday) {
@@ -81,6 +105,21 @@ public class Store extends BaseTimeEntity {
         this.breakPolicy = breakPolicy == null ? BreakPolicy.STATUTORY : breakPolicy;
         this.smallBusiness = Boolean.TRUE.equals(smallBusiness);
         this.payday = payday;
+    }
+
+    /**
+     * 단계 하나를 확인 상태로 표시한다. 이미 표시되어 있으면 아무 일도 하지 않으므로, 같은 요청이
+     * 여러 번 들어와도 결과가 같다.
+     */
+    public void confirmOnboardingStep(String stepKey) {
+        this.confirmedOnboardingSteps.add(stepKey);
+    }
+
+    /** 온보딩을 마친 것으로 표시한다. 이미 마쳤다면 처음 끝낸 시각을 유지한다. */
+    public void completeOnboarding() {
+        if (this.onboardingCompletedAt == null) {
+            this.onboardingCompletedAt = LocalDateTime.now();
+        }
     }
 
     public void changeInviteCode(String inviteCode) {

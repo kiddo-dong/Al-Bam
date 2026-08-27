@@ -70,7 +70,24 @@ curl -s -H "Authorization: Bearer $TOKEN" \
   "$BASE_URL/api/v1/stores/$STORE_ID/checklist-items" | python3 -m json.tool
 
 echo ""
-echo "== 5. 같은 이름 근무 유형은 거부된다 (전부 롤백) =="
+echo "== 5. 온보딩 진행 상태 (처음엔 비어 있다) =="
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "$BASE_URL/api/v1/stores/$STORE_ID/onboarding" | python3 -m json.tool
+
+echo ""
+echo "== 6. 사장님이 단계를 확인 처리 (같은 단계를 두 번 보내도 결과가 같다) =="
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  "$BASE_URL/api/v1/stores/$STORE_ID/onboarding/steps/checklist" > /dev/null
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  "$BASE_URL/api/v1/stores/$STORE_ID/onboarding/steps/checklist" | python3 -m json.tool
+
+echo ""
+echo "== 7. 온보딩 마침 =="
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  "$BASE_URL/api/v1/stores/$STORE_ID/onboarding/complete" | python3 -m json.tool
+
+echo ""
+echo "== 8. 같은 이름 근무 유형은 거부된다 (전부 롤백) =="
 curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"items": [
         {"name": "새벽", "startTime": "05:00", "endTime": "09:00", "breakMinutes": 0},
