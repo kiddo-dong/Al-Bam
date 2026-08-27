@@ -59,9 +59,17 @@ public class Store extends BaseTimeEntity {
     @Column(nullable = false)
     private boolean smallBusiness;
 
+    /**
+     * 급여 지급일(매월 며칠). 미지정이면 null.
+     *
+     * <p>알바생에게 "며칠에 받는지" 보여주기 위한 값일 뿐, 앱이 지급을 처리하지는 않는다. 그래서
+     * 31일로 둔 매장의 2월을 며칠로 볼지 같은 규칙은 두지 않는다 — 실제 지급은 사장이 알아서 한다.
+     */
+    private Integer payday;
+
     public Store(String name, String address, String businessRegistrationNumber, StoreCategory category,
             Map<DayOfWeek, BusinessHour> businessHours, String inviteCode, BreakPolicy breakPolicy,
-            Boolean smallBusiness) {
+            Boolean smallBusiness, Integer payday) {
         this.name = name;
         this.address = address;
         this.businessRegistrationNumber = businessRegistrationNumber;
@@ -72,6 +80,7 @@ public class Store extends BaseTimeEntity {
         this.inviteCode = inviteCode;
         this.breakPolicy = breakPolicy == null ? BreakPolicy.STATUTORY : breakPolicy;
         this.smallBusiness = Boolean.TRUE.equals(smallBusiness);
+        this.payday = payday;
     }
 
     public void changeInviteCode(String inviteCode) {
@@ -79,7 +88,8 @@ public class Store extends BaseTimeEntity {
     }
 
     public void update(String name, String address, String businessRegistrationNumber, StoreCategory category,
-            Map<DayOfWeek, BusinessHour> businessHours, BreakPolicy breakPolicy, Boolean smallBusiness) {
+            Map<DayOfWeek, BusinessHour> businessHours, BreakPolicy breakPolicy, Boolean smallBusiness,
+            Integer payday) {
         this.name = name;
         this.address = address;
         this.businessRegistrationNumber = businessRegistrationNumber;
@@ -90,5 +100,6 @@ public class Store extends BaseTimeEntity {
         }
         this.breakPolicy = breakPolicy == null ? BreakPolicy.STATUTORY : breakPolicy;
         this.smallBusiness = Boolean.TRUE.equals(smallBusiness);
+        this.payday = payday;
     }
 }

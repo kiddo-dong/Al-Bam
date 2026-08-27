@@ -62,7 +62,7 @@ class AttendanceReportServiceTest {
     @BeforeEach
     void setUp() {
         Store store = new Store("테스트 매장", "서울", null, null, new HashMap<>(), "ABC123",
-                BreakPolicy.STATUTORY, false);
+                BreakPolicy.STATUTORY, false, null);
         ReflectionTestUtils.setField(store, "id", STORE_ID);
 
         User user = new User("staff@albam.dev", "pw", "직원", "010-0000-0000",

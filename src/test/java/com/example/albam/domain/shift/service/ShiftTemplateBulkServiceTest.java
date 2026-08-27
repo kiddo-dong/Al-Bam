@@ -48,7 +48,7 @@ class ShiftTemplateBulkServiceTest {
     @BeforeEach
     void setUp() {
         User user = new User("owner@albam.dev", "사장", AuthProvider.LOCAL, "local-1");
-        Store store = new Store("가게", null, null, null, null, "ABC123", null, null);
+        Store store = new Store("가게", null, null, null, null, "ABC123", null, null, null);
         lenient().when(storeAuthorizationService.requireOwnerOrManager(STORE_ID, USER_ID))
                 .thenReturn(new StoreMember(store, user, MemberRole.OWNER, 0));
         lenient().when(shiftTemplateRepository.saveAll(any()))

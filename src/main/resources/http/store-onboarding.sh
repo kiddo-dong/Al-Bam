@@ -23,6 +23,7 @@ STORE_ID=$(curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: a
         "category": "CAFE",
         "smallBusiness": true,
         "breakPolicy": "STATUTORY",
+        "payday": 10,
         "businessHours": {
           "MONDAY":    {"openTime": "08:00", "closeTime": "22:00", "closed": false},
           "TUESDAY":   {"openTime": "08:00", "closeTime": "22:00", "closed": false},

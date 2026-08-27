@@ -50,7 +50,7 @@ class StoreMemberServiceTest {
     @BeforeEach
     void setUp() {
         Store store = new Store("테스트 매장", "서울", null, null, new HashMap<>(), "ABC123",
-                BreakPolicy.STATUTORY, false);
+                BreakPolicy.STATUTORY, false, null);
         ReflectionTestUtils.setField(store, "id", STORE_ID);
 
         User managerUser = new User("manager@albam.dev", "pw", "매니저", "010-0000-0000",
@@ -156,7 +156,7 @@ class StoreMemberServiceTest {
     @Test
     void getStoreMember_throwsWhenMemberBelongsToDifferentStore() {
         Store otherStore = new Store("다른 매장", "부산", null, null, new HashMap<>(), "XYZ999",
-                BreakPolicy.STATUTORY, false);
+                BreakPolicy.STATUTORY, false, null);
         ReflectionTestUtils.setField(otherStore, "id", 999L);
         StoreMember memberOfOtherStore = new StoreMember(otherStore, staffTarget.getUser(), MemberRole.STAFF, 10_000);
         ReflectionTestUtils.setField(memberOfOtherStore, "id", TARGET_MEMBER_ID);

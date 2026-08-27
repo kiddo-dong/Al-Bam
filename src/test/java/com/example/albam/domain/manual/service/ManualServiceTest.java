@@ -64,7 +64,7 @@ class ManualServiceTest {
     @BeforeEach
     void setUp() {
         Store store = new Store("테스트 매장", "서울", null, null, new HashMap<>(), "ABC123",
-                BreakPolicy.STATUTORY, false);
+                BreakPolicy.STATUTORY, false, null);
         ReflectionTestUtils.setField(store, "id", STORE_ID);
         User user = new User("manager@albam.dev", "pw", "매니저", "010-0000-0000",
                 LocalDate.of(1990, 1, 1), null);

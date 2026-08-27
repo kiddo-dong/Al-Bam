@@ -234,7 +234,7 @@ class ShiftServiceTest {
 
     private Store store(Map<DayOfWeek, BusinessHour> businessHours, BreakPolicy breakPolicy, boolean smallBusiness) {
         Store store = new Store("테스트 매장", "서울", null, null,
-                new HashMap<>(businessHours), "ABC123", breakPolicy, smallBusiness);
+                new HashMap<>(businessHours), "ABC123", breakPolicy, smallBusiness, null);
         ReflectionTestUtils.setField(store, "id", STORE_ID);
         return store;
     }
