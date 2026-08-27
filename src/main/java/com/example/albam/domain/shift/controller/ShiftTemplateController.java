@@ -1,5 +1,6 @@
 package com.example.albam.domain.shift.controller;
 
+import com.example.albam.domain.shift.dto.ShiftTemplateBulkRequest;
 import com.example.albam.domain.shift.dto.ShiftTemplateRequest;
 import com.example.albam.domain.shift.dto.ShiftTemplateResponse;
 import com.example.albam.domain.shift.service.ShiftTemplateService;
@@ -35,6 +36,19 @@ public class ShiftTemplateController {
     }
 
     /** 템플릿 목록 — 멤버 누구나 (스케줄 화면에서 프리셋 버튼으로 사용). */
+    /**
+     * 근무 유형 일괄 등록 (OWNER/MANAGER).
+     *
+     * <p>배열 순서대로 순번이 매겨지며, 이름이 겹치거나 하나라도 실패하면 전부 등록되지 않는다.
+     */
+    @PostMapping("/bulk")
+    public ResponseEntity<ApiResponse<List<ShiftTemplateResponse>>> createTemplates(
+            @PathVariable Long storeId, @CurrentUserId Long userId,
+            @Valid @RequestBody ShiftTemplateBulkRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(shiftTemplateService.createTemplates(storeId, userId, request)));
+    }
+
     @GetMapping
     public ApiResponse<List<ShiftTemplateResponse>> getTemplates(@PathVariable Long storeId,
             @CurrentUserId Long userId) {

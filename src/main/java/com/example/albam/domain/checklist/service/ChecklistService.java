@@ -1,16 +1,20 @@
 package com.example.albam.domain.checklist.service;
 
+import com.example.albam.domain.checklist.dto.ChecklistItemBulkRequest;
 import com.example.albam.domain.checklist.dto.ChecklistItemRequest;
 import com.example.albam.domain.checklist.dto.ChecklistItemResponse;
 import com.example.albam.domain.checklist.dto.DailyChecklistEntry;
 import com.example.albam.domain.checklist.entity.ChecklistCompletion;
 import com.example.albam.domain.checklist.entity.ChecklistItem;
+import com.example.albam.domain.checklist.entity.ChecklistType;
 import com.example.albam.domain.checklist.repository.ChecklistCompletionRepository;
 import com.example.albam.domain.checklist.repository.ChecklistItemRepository;
 import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.NotFoundException;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -33,6 +37,32 @@ public class ChecklistService {
         ChecklistItem item = checklistItemRepository.save(new ChecklistItem(manager.getStore(),
                 request.type(), request.content(), request.displayOrderOrDefault()));
         return ChecklistItemResponse.from(item);
+    }
+
+    /**
+     * 여러 항목을 한 번에 등록한다. 업종 프리셋처럼 10개 안팎을 넣을 때 쓰인다.
+     *
+     * <p>한 트랜잭션이라 하나라도 실패하면 전부 되돌아간다. 단건 등록을 반복하면 앞의 몇 개만 남는
+     * 상태가 생기는데, 온보딩에서는 항목이 하나만 있어도 완료로 보여 그 절반의 실패를 알아채기 어렵다.
+     *
+     * <p>{@code displayOrder}는 요청 배열의 순서로 매긴다. 다만 0부터 다시 매기면 이미 있는 항목과
+     * 겹치므로, 그 매장·구분의 현재 최대 순번 뒤에 이어 붙인다.
+     */
+    @Transactional
+    public List<ChecklistItemResponse> addItems(Long storeId, Long userId, ChecklistItemBulkRequest request) {
+        StoreMember manager = storeAuthorizationService.requireOwnerOrManager(storeId, userId);
+
+        Map<ChecklistType, Integer> nextOrder = new EnumMap<>(ChecklistType.class);
+        List<ChecklistItem> items = new ArrayList<>();
+        for (ChecklistItemRequest item : request.items()) {
+            int order = nextOrder.computeIfAbsent(item.type(),
+                    type -> checklistItemRepository.findMaxDisplayOrder(storeId, type).orElse(-1) + 1);
+            nextOrder.put(item.type(), order + 1);
+            items.add(new ChecklistItem(manager.getStore(), item.type(), item.content(), order));
+        }
+        return checklistItemRepository.saveAll(items).stream()
+                .map(ChecklistItemResponse::from)
+                .toList();
     }
 
     public List<ChecklistItemResponse> getItems(Long storeId, Long userId) {

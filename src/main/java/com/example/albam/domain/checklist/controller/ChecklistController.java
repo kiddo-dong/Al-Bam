@@ -1,5 +1,6 @@
 package com.example.albam.domain.checklist.controller;
 
+import com.example.albam.domain.checklist.dto.ChecklistItemBulkRequest;
 import com.example.albam.domain.checklist.dto.ChecklistItemRequest;
 import com.example.albam.domain.checklist.dto.ChecklistItemResponse;
 import com.example.albam.domain.checklist.dto.DailyChecklistEntry;
@@ -34,6 +35,19 @@ public class ChecklistController {
             @CurrentUserId Long userId, @Valid @RequestBody ChecklistItemRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(checklistService.addItem(storeId, userId, request)));
+    }
+
+    /**
+     * 체크리스트 항목 일괄 등록 (OWNER/MANAGER).
+     *
+     * <p>배열 순서대로 순번이 매겨지며, 하나라도 실패하면 전부 등록되지 않는다.
+     * 업종 프리셋을 넣는 온보딩처럼 여러 항목을 한꺼번에 넣을 때 쓴다.
+     */
+    @PostMapping("/api/v1/stores/{storeId}/checklist-items/bulk")
+    public ResponseEntity<ApiResponse<List<ChecklistItemResponse>>> addItems(@PathVariable Long storeId,
+            @CurrentUserId Long userId, @Valid @RequestBody ChecklistItemBulkRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(checklistService.addItems(storeId, userId, request)));
     }
 
     /** 항목 마스터 목록 — 멤버 누구나. */
