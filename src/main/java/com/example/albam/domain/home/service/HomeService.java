@@ -149,7 +149,9 @@ public class HomeService {
             }
             AttendanceReportEntry entry = reportByShiftId.get(shift.getId());
             roster.add(new TodayRosterEntry(shift.getId(), shift.getStoreMember().getId(),
-                    shift.getStoreMember().getUser().getName(), shift.getStartTime(), shift.getEndTime(),
+                    shift.getStoreMember().getUser().getName(),
+                    profileImageUrls.of(shift.getStoreMember().getUser()),
+                    shift.getStartTime(), shift.getEndTime(),
                     entry == null ? null : entry.status(),
                     entry == null ? null : entry.clockInAt(),
                     entry == null ? null : entry.clockOutAt()));

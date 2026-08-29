@@ -12,6 +12,7 @@ import com.example.albam.domain.shift.repository.ShiftRepository;
 import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.ForbiddenException;
+import com.example.albam.global.file.ProfileImageUrls;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -42,6 +43,7 @@ public class AttendanceReportService {
     private final AttendanceRepository attendanceRepository;
     private final LeaveUsageRepository leaveUsageRepository;
     private final StoreAuthorizationService storeAuthorizationService;
+    private final ProfileImageUrls profileImageUrls;
 
     public List<AttendanceReportEntry> getReport(Long storeId, Long userId, Long storeMemberId,
             LocalDate from, LocalDate to) {
@@ -113,6 +115,7 @@ public class AttendanceReportService {
             if (!matchedAttendanceIds.contains(attendance.getId())) {
                 entries.add(new AttendanceReportEntry(null, attendance.getId(),
                         attendance.getStoreMember().getId(), attendance.getStoreMember().getUser().getName(),
+                        profileImageUrls.of(attendance.getStoreMember().getUser()),
                         attendance.getWorkDate(), null, null, attendance.getClockInAt(),
                         attendance.getClockOutAt(), WorkComplianceStatus.EXTRA, 0, 0));
             }
@@ -167,6 +170,7 @@ public class AttendanceReportService {
                 attendance == null ? null : attendance.getId(),
                 shift.getStoreMember().getId(),
                 shift.getStoreMember().getUser().getName(),
+                profileImageUrls.of(shift.getStoreMember().getUser()),
                 shift.getWorkDate(),
                 shift.getStartTime(),
                 shift.getEndTime(),

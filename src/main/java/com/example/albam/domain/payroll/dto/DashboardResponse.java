@@ -22,6 +22,8 @@ public record DashboardResponse(
     public record MemberCostRow(
             Long storeMemberId,
             String userName,
+            /** 프로필 사진 공개 URL. 등록하지 않았으면 null. */
+            String userProfileImageUrl,
             MemberRole role,
             MemberStatus status,
             int hourlyWage,

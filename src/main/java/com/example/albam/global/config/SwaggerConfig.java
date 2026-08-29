@@ -17,7 +17,7 @@ public class SwaggerConfig {
     public OpenAPI openAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("알밤(Al-Bam) API")
+                        .title("ToTheWork API")
                         .description("자영업자를 위한 알바생·매장 관리 서비스 API. "
                                 + "로그인 후 발급받은 Access Token을 우측 상단 Authorize 버튼에 입력하세요.")
                         .version("v1"))

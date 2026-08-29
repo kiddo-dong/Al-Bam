@@ -22,6 +22,7 @@ import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.domain.user.entity.User;
 import com.example.albam.global.exception.ForbiddenException;
+import com.example.albam.global.file.ProfileImageUrls;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -46,6 +47,8 @@ class AttendanceReportServiceTest {
     private LeaveUsageRepository leaveUsageRepository;
     @Mock
     private StoreAuthorizationService storeAuthorizationService;
+    @Mock
+    private ProfileImageUrls profileImageUrls;
 
     @InjectMocks
     private AttendanceReportService attendanceReportService;

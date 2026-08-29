@@ -48,6 +48,8 @@ public record HomeResponse(
             Long shiftId,
             Long storeMemberId,
             String userName,
+            /** 프로필 사진 공개 URL. 등록하지 않았으면 null. */
+            String userProfileImageUrl,
             LocalTime startTime,
             LocalTime endTime,
             WorkComplianceStatus compliance,

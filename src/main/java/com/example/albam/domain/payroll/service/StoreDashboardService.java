@@ -22,6 +22,7 @@ import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.labor.LaborStandards;
+import com.example.albam.global.file.ProfileImageUrls;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -50,6 +51,7 @@ public class StoreDashboardService {
     private final StoreAuthorizationService storeAuthorizationService;
     private final AttendanceReportService attendanceReportService;
     private final PayrollService payrollService;
+    private final ProfileImageUrls profileImageUrls;
 
     public DashboardResponse getDashboard(Long storeId, Long userId, int year, int month) {
         if (month < 1 || month > 12) {
@@ -107,7 +109,8 @@ public class StoreDashboardService {
             totalWorkMinutes += workMinutes;
             totalLaborCost += totalPay;
             totalDeduction += deduction;
-            rows.add(new MemberCostRow(member.getId(), member.getUser().getName(), member.getRole(),
+            rows.add(new MemberCostRow(member.getId(), member.getUser().getName(),
+                    profileImageUrls.of(member.getUser()), member.getRole(),
                     member.getStatus(), member.getHourlyWage(), workMinutes, totalPay,
                     totalPay - deduction));
         }
@@ -135,7 +138,8 @@ public class StoreDashboardService {
                 .map(entry -> {
                     Attendance attendance = entry.attendanceId() == null ? null
                             : attendanceById.get(entry.attendanceId());
-                    return new DailyMemberRow(entry.storeMemberId(), entry.userName(), entry.clockInAt(),
+                    return new DailyMemberRow(entry.storeMemberId(), entry.userName(),
+                            entry.userProfileImageUrl(), entry.clockInAt(),
                             entry.clockOutAt(), attendance == null ? null : attendance.getBreakMinutes(),
                             attendance == null ? 0 : workMinutesOf(attendance), entry.status(),
                             entry.lateMinutes(), entry.earlyLeaveMinutes());
@@ -194,7 +198,8 @@ public class StoreDashboardService {
             } else {
                 capMinutes = (long) LaborStandards.MAX_WEEKLY_WORK_MINUTES;
             }
-            rows.add(new WeeklyMemberRow(member.getId(), member.getUser().getName(), actual, remaining,
+            rows.add(new WeeklyMemberRow(member.getId(), member.getUser().getName(),
+                    profileImageUrls.of(member.getUser()), actual, remaining,
                     projected, capMinutes, capMinutes != null && projected > capMinutes,
                     projected >= LaborStandards.WEEKLY_HOLIDAY_ELIGIBLE_MINUTES));
         }
