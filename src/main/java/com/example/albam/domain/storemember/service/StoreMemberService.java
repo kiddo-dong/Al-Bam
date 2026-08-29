@@ -12,6 +12,7 @@ import com.example.albam.global.exception.ForbiddenException;
 import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.exception.NotFoundException;
 import com.example.albam.global.labor.LaborStandards;
+import com.example.albam.global.file.ProfileImageUrls;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,13 +24,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class StoreMemberService {
 
     private final StoreMemberRepository storeMemberRepository;
+    private final ProfileImageUrls profileImageUrls;
     private final StoreAuthorizationService storeAuthorizationService;
 
     /** 멤버 전체 상세 목록 (시급·이메일·공제방식 등 민감정보 포함) — OWNER/MANAGER. */
     public List<StoreMemberResponse> getMembers(Long storeId, Long userId) {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         return storeMemberRepository.findAllByStoreId(storeId).stream()
-                .map(StoreMemberResponse::from)
+                .map(member -> StoreMemberResponse.from(member, profileImageUrls.of(member.getUser())))
                 .toList();
     }
 
@@ -38,7 +40,7 @@ public class StoreMemberService {
         storeAuthorizationService.requireMember(storeId, userId);
         return storeMemberRepository.findAllByStoreId(storeId).stream()
                 .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
-                .map(StoreMemberSummaryResponse::from)
+                .map(member -> StoreMemberSummaryResponse.from(member, profileImageUrls.of(member.getUser())))
                 .toList();
     }
 
@@ -76,14 +78,14 @@ public class StoreMemberService {
         if (request.taxMode() != null) {
             target.changeTaxMode(request.taxMode());
         }
-        return StoreMemberResponse.from(target);
+        return StoreMemberResponse.from(target, profileImageUrls.of(target.getUser()));
     }
 
     @Transactional
     public StoreMemberResponse updateMyAvailableDays(Long storeId, Long userId, UpdateAvailableDaysRequest request) {
         StoreMember member = storeAuthorizationService.requireMember(storeId, userId);
         member.changeAvailableDays(request.availableDays());
-        return StoreMemberResponse.from(member);
+        return StoreMemberResponse.from(member, profileImageUrls.of(member.getUser()));
     }
 
     /** 본인 퇴사: 근무 이력 보존을 위해 행을 지우지 않고 INACTIVE로 전환한다. */

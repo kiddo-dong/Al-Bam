@@ -7,9 +7,12 @@ import com.example.albam.domain.storemember.entity.StoreMember;
 public record StoreMemberSummaryResponse(
         Long id,
         String userName,
+        /** 프로필 사진 공개 URL. 등록하지 않았으면 null. */
+        String userProfileImageUrl,
         MemberRole role
 ) {
-    public static StoreMemberSummaryResponse from(StoreMember member) {
-        return new StoreMemberSummaryResponse(member.getId(), member.getUser().getName(), member.getRole());
+    public static StoreMemberSummaryResponse from(StoreMember member, String userProfileImageUrl) {
+        return new StoreMemberSummaryResponse(member.getId(), member.getUser().getName(),
+                userProfileImageUrl, member.getRole());
     }
 }

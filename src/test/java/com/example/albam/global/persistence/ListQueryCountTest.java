@@ -125,7 +125,8 @@ class ListQueryCountTest {
         startCounting();
 
         List<StoreMemberResponse> members = storeMemberRepository.findAllByStoreId(store.getId()).stream()
-                .map(StoreMemberResponse::from)
+                // 실제 서비스와 같은 매핑을 흉내 낸다 — 사진 key까지 읽어야 조회 수가 같아진다.
+                .map(member -> StoreMemberResponse.from(member, member.getUser().getProfileImageKey()))
                 .toList();
 
         assertThat(members).hasSize(5);
@@ -149,7 +150,8 @@ class ListQueryCountTest {
 
         List<HandoverNoteResponse> notes = handoverNoteRepository
                 .findAllByStoreIdAndWorkDateBetweenOrderByCreatedAtDesc(store.getId(), today, today).stream()
-                .map(HandoverNoteResponse::from)
+                .map(note -> HandoverNoteResponse.from(note,
+                        note.getAuthor().getUser().getProfileImageKey()))
                 .toList();
 
         assertThat(notes).hasSize(5);

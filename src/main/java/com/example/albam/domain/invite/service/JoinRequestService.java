@@ -18,6 +18,7 @@ import com.example.albam.global.exception.ConflictException;
 import com.example.albam.global.exception.ForbiddenException;
 import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.exception.NotFoundException;
+import com.example.albam.global.file.ProfileImageUrls;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ public class JoinRequestService {
     private static final int DEFAULT_WAGE = 0;
 
     private final JoinRequestRepository joinRequestRepository;
+    private final ProfileImageUrls profileImageUrls;
     private final StoreRepository storeRepository;
     private final StoreMemberRepository storeMemberRepository;
     private final UserRepository userRepository;
@@ -51,12 +53,12 @@ public class JoinRequestService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("사용자를 찾을 수 없습니다."));
         JoinRequest joinRequest = joinRequestRepository.save(new JoinRequest(store, user));
-        return JoinRequestResponse.from(joinRequest);
+        return JoinRequestResponse.from(joinRequest, profileImageUrls.of(joinRequest.getUser()));
     }
 
     public List<JoinRequestResponse> getMyRequests(Long userId) {
         return joinRequestRepository.findAllByUserIdOrderByRequestedAtDesc(userId).stream()
-                .map(JoinRequestResponse::from)
+                .map(request -> JoinRequestResponse.from(request, profileImageUrls.of(request.getUser())))
                 .toList();
     }
 
@@ -77,7 +79,7 @@ public class JoinRequestService {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         return joinRequestRepository
                 .findAllByStoreIdAndStatusOrderByRequestedAtAsc(storeId, JoinRequestStatus.PENDING).stream()
-                .map(JoinRequestResponse::from)
+                .map(request -> JoinRequestResponse.from(request, profileImageUrls.of(request.getUser())))
                 .toList();
     }
 
@@ -103,7 +105,7 @@ public class JoinRequestService {
             storeMemberRepository.save(
                     new StoreMember(joinRequest.getStore(), joinRequest.getUser(), request.role(), DEFAULT_WAGE));
         }
-        return JoinRequestResponse.from(joinRequest);
+        return JoinRequestResponse.from(joinRequest, profileImageUrls.of(joinRequest.getUser()));
     }
 
     @Transactional
@@ -111,7 +113,7 @@ public class JoinRequestService {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         JoinRequest joinRequest = getJoinRequest(storeId, requestId);
         joinRequest.reject();
-        return JoinRequestResponse.from(joinRequest);
+        return JoinRequestResponse.from(joinRequest, profileImageUrls.of(joinRequest.getUser()));
     }
 
     private JoinRequest getJoinRequest(Long storeId, Long requestId) {

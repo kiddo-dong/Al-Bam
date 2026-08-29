@@ -14,6 +14,7 @@ import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.exception.NotFoundException;
 import com.example.albam.global.labor.LaborStandards;
+import com.example.albam.global.file.ProfileImageUrls;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -28,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
+    private final ProfileImageUrls profileImageUrls;
     private final StoreMemberRepository storeMemberRepository;
     private final StoreAuthorizationService storeAuthorizationService;
 
@@ -49,7 +51,8 @@ public class AttendanceService {
                     request.breakMinutes());
             attendance.correctTimes(request.clockInAt(), request.clockOutAt(), breakMinutes);
         }
-        return AttendanceResponse.from(attendanceRepository.save(attendance));
+        return AttendanceResponse.from(attendanceRepository.save(attendance),
+                profileImageUrls.of(target.getUser()));
     }
 
     @Transactional
@@ -60,7 +63,7 @@ public class AttendanceService {
                     throw new InvalidRequestException("이미 출근 중입니다.");
                 });
         Attendance attendance = attendanceRepository.save(new Attendance(member, LocalDateTime.now()));
-        return AttendanceResponse.from(attendance);
+        return AttendanceResponse.from(attendance, profileImageUrls.of(attendance.getStoreMember().getUser()));
     }
 
     @Transactional
@@ -71,14 +74,15 @@ public class AttendanceService {
                 .orElseThrow(() -> new InvalidRequestException("출근 중인 근무가 없습니다."));
         LocalDateTime now = LocalDateTime.now();
         attendance.clockOut(now, resolveBreakMinutes(member, attendance.getClockInAt(), now, null));
-        return AttendanceResponse.from(attendance);
+        return AttendanceResponse.from(attendance, profileImageUrls.of(attendance.getStoreMember().getUser()));
     }
 
     public List<AttendanceResponse> getMyAttendance(Long storeId, Long userId, LocalDate from, LocalDate to) {
         StoreMember member = storeAuthorizationService.requireMember(storeId, userId);
         return attendanceRepository
                 .findAllByStoreMemberIdAndWorkDateBetweenOrderByWorkDateDesc(member.getId(), from, to).stream()
-                .map(AttendanceResponse::from)
+                .map(attendance -> AttendanceResponse.from(attendance,
+                        profileImageUrls.of(attendance.getStoreMember().getUser())))
                 .toList();
     }
 
@@ -86,7 +90,8 @@ public class AttendanceService {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         return attendanceRepository
                 .findAllByStoreMemberStoreIdAndWorkDateBetweenOrderByWorkDateDesc(storeId, from, to).stream()
-                .map(AttendanceResponse::from)
+                .map(attendance -> AttendanceResponse.from(attendance,
+                        profileImageUrls.of(attendance.getStoreMember().getUser())))
                 .toList();
     }
 
@@ -99,7 +104,7 @@ public class AttendanceService {
                 : resolveBreakMinutes(attendance.getStoreMember(), request.clockInAt(), request.clockOutAt(),
                         request.breakMinutes());
         attendance.correctTimes(request.clockInAt(), request.clockOutAt(), breakMinutes);
-        return AttendanceResponse.from(attendance);
+        return AttendanceResponse.from(attendance, profileImageUrls.of(attendance.getStoreMember().getUser()));
     }
 
     @Transactional

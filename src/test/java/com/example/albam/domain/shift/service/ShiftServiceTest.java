@@ -22,6 +22,7 @@ import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.domain.user.entity.User;
 import com.example.albam.global.exception.InvalidRequestException;
+import com.example.albam.global.file.ProfileImageUrls;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -47,6 +48,8 @@ class ShiftServiceTest {
     private StoreMemberRepository storeMemberRepository;
     @Mock
     private StoreAuthorizationService storeAuthorizationService;
+    @Mock
+    private ProfileImageUrls profileImageUrls;
 
     @InjectMocks
     private ShiftService shiftService;

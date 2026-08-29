@@ -8,6 +8,7 @@ import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.ForbiddenException;
 import com.example.albam.global.exception.NotFoundException;
+import com.example.albam.global.file.ProfileImageUrls;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class HandoverNoteService {
 
     private final HandoverNoteRepository handoverNoteRepository;
+    private final ProfileImageUrls profileImageUrls;
     private final StoreAuthorizationService storeAuthorizationService;
 
     @Transactional
@@ -28,14 +30,14 @@ public class HandoverNoteService {
         LocalDate workDate = request.workDate() == null ? LocalDate.now() : request.workDate();
         HandoverNote note = handoverNoteRepository.save(
                 new HandoverNote(author.getStore(), author, request.content(), workDate));
-        return HandoverNoteResponse.from(note);
+        return HandoverNoteResponse.from(note, profileImageUrls.of(note.getAuthor().getUser()));
     }
 
     public List<HandoverNoteResponse> getNotes(Long storeId, Long userId, LocalDate from, LocalDate to) {
         storeAuthorizationService.requireMember(storeId, userId);
         return handoverNoteRepository
                 .findAllByStoreIdAndWorkDateBetweenOrderByCreatedAtDesc(storeId, from, to).stream()
-                .map(HandoverNoteResponse::from)
+                .map(note -> HandoverNoteResponse.from(note, profileImageUrls.of(note.getAuthor().getUser())))
                 .toList();
     }
 

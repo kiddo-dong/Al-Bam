@@ -12,6 +12,7 @@ import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.repository.StoreMemberRepository;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.NotFoundException;
+import com.example.albam.global.file.ProfileImageUrls;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
@@ -28,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class NoticeService {
 
     private final NoticeRepository noticeRepository;
+    private final ProfileImageUrls profileImageUrls;
     private final NoticeReadRepository noticeReadRepository;
     private final StoreMemberRepository storeMemberRepository;
     private final StoreAuthorizationService storeAuthorizationService;
@@ -37,7 +39,7 @@ public class NoticeService {
         StoreMember author = storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         Notice notice = noticeRepository.save(
                 new Notice(author.getStore(), author, request.title(), request.content()));
-        return NoticeResponse.from(notice, 0, false);
+        return NoticeResponse.from(notice, profileImageUrls.of(author.getUser()), 0, false);
     }
 
     public List<NoticeResponse> getNotices(Long storeId, Long userId) {
@@ -55,6 +57,7 @@ public class NoticeService {
 
         return notices.stream()
                 .map(notice -> NoticeResponse.from(notice,
+                        profileImageUrls.of(notice.getAuthor().getUser()),
                         readCountByNoticeId.getOrDefault(notice.getId(), 0L),
                         readNoticeIds.contains(notice.getId())))
                 .toList();
@@ -80,7 +83,7 @@ public class NoticeService {
         return storeMemberRepository.findAllByStoreId(storeId).stream()
                 .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
                 .map(member -> new NoticeReadStatusResponse(member.getId(), member.getUser().getName(),
-                        readAtByMemberId.get(member.getId())))
+                        profileImageUrls.of(member.getUser()), readAtByMemberId.get(member.getId())))
                 .toList();
     }
 

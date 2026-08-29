@@ -9,6 +9,8 @@ public record ShiftResponse(
         Long id,
         Long storeMemberId,
         String userName,
+        /** 프로필 사진 공개 URL. 등록하지 않았으면 null. */
+        String userProfileImageUrl,
         LocalDate workDate,
         LocalTime startTime,
         LocalTime endTime,
@@ -16,11 +18,12 @@ public record ShiftResponse(
         int breakMinutes,
         ShiftStatus status
 ) {
-    public static ShiftResponse from(Shift shift) {
+    public static ShiftResponse from(Shift shift, String userProfileImageUrl) {
         return new ShiftResponse(
                 shift.getId(),
                 shift.getStoreMember().getId(),
                 shift.getStoreMember().getUser().getName(),
+                userProfileImageUrl,
                 shift.getWorkDate(),
                 shift.getStartTime(),
                 shift.getEndTime(),

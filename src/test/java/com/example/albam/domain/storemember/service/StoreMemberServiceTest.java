@@ -17,6 +17,7 @@ import com.example.albam.domain.store.entity.Store;
 import com.example.albam.domain.user.entity.User;
 import com.example.albam.global.exception.ForbiddenException;
 import com.example.albam.global.exception.InvalidRequestException;
+import com.example.albam.global.file.ProfileImageUrls;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,6 +37,8 @@ class StoreMemberServiceTest {
     private StoreMemberRepository storeMemberRepository;
     @Mock
     private StoreAuthorizationService storeAuthorizationService;
+    @Mock
+    private ProfileImageUrls profileImageUrls;
 
     @InjectMocks
     private StoreMemberService storeMemberService;

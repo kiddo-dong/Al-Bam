@@ -19,6 +19,7 @@ import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.exception.NotFoundException;
 import com.example.albam.global.labor.LaborStandards;
+import com.example.albam.global.file.ProfileImageUrls;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -40,6 +41,7 @@ public class ShiftService {
     private static final int MAX_RECURRING_PERIOD_DAYS = 92;
 
     private final ShiftRepository shiftRepository;
+    private final ProfileImageUrls profileImageUrls;
     private final StoreMemberRepository storeMemberRepository;
     private final StoreAuthorizationService storeAuthorizationService;
 
@@ -51,7 +53,7 @@ public class ShiftService {
                 request.endTime(), request.breakMinutes(), null);
         Shift shift = shiftRepository.save(
                 new Shift(target, request.workDate(), request.startTime(), request.endTime(), breakMinutes));
-        return ShiftResponse.from(shift);
+        return ShiftResponse.from(shift, profileImageUrls.of(shift.getStoreMember().getUser()));
     }
 
     /**
@@ -116,7 +118,7 @@ public class ShiftService {
                 Shift shift = shiftRepository.save(
                         new Shift(target, date, request.startTime(), request.endTime(), breakMinutes));
                 memberShiftsCache.add(shift);
-                created.add(ShiftResponse.from(shift));
+                created.add(ShiftResponse.from(shift, profileImageUrls.of(shift.getStoreMember().getUser())));
             } catch (InvalidRequestException e) {
                 skipped.add(new SkippedShiftDate(date, e.getMessage()));
             }
@@ -136,7 +138,7 @@ public class ShiftService {
             shifts = shiftRepository.findAllByStoreMemberStoreIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(
                     storeId, from, to);
         }
-        return shifts.stream().map(ShiftResponse::from).toList();
+        return shifts.stream().map(shift -> ShiftResponse.from(shift, profileImageUrls.of(shift.getStoreMember().getUser()))).toList();
     }
 
     @Transactional
@@ -154,7 +156,7 @@ public class ShiftService {
                     request.endTime(), request.breakMinutes(), shiftId);
         }
         shift.update(request.workDate(), request.startTime(), request.endTime(), breakMinutes, request.status());
-        return ShiftResponse.from(shift);
+        return ShiftResponse.from(shift, profileImageUrls.of(shift.getStoreMember().getUser()));
     }
 
     @Transactional

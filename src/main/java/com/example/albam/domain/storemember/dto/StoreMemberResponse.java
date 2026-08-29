@@ -13,6 +13,8 @@ public record StoreMemberResponse(
         Long userId,
         String userName,
         String userEmail,
+        /** 프로필 사진 공개 URL. 등록하지 않았으면 null. */
+        String userProfileImageUrl,
         MemberRole role,
         int hourlyWage,
         MemberStatus status,
@@ -22,12 +24,14 @@ public record StoreMemberResponse(
         DayOfWeek weeklyHolidayDay,
         TaxMode taxMode
 ) {
-    public static StoreMemberResponse from(StoreMember member) {
+    /** 사진 URL은 엔티티에 없는 값이라(저장된 것은 S3 key다) 서비스가 조립해 넘긴다. */
+    public static StoreMemberResponse from(StoreMember member, String userProfileImageUrl) {
         return new StoreMemberResponse(
                 member.getId(),
                 member.getUser().getId(),
                 member.getUser().getName(),
                 member.getUser().getEmail(),
+                userProfileImageUrl,
                 member.getRole(),
                 member.getHourlyWage(),
                 member.getStatus(),

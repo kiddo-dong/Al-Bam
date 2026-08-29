@@ -34,6 +34,7 @@ import com.example.albam.domain.supplier.entity.Supplier;
 import com.example.albam.domain.supplier.entity.SupplierItem;
 import com.example.albam.domain.supplier.repository.SupplierItemRepository;
 import com.example.albam.domain.supplier.repository.SupplierRepository;
+import com.example.albam.global.file.ProfileImageUrls;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -57,6 +58,7 @@ public class HomeService {
 
     private final StoreAuthorizationService storeAuthorizationService;
     private final ShiftRepository shiftRepository;
+    private final ProfileImageUrls profileImageUrls;
     private final AttendanceRepository attendanceRepository;
     private final NoticeRepository noticeRepository;
     private final NoticeReadRepository noticeReadRepository;
@@ -86,7 +88,7 @@ public class HomeService {
                 .findAllByStoreMemberIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(me.getId(), today, today)
                 .stream()
                 .filter(shift -> shift.getStatus() != ShiftStatus.CANCELED)
-                .map(ShiftResponse::from)
+                .map(shift -> ShiftResponse.from(shift, profileImageUrls.of(shift.getStoreMember().getUser())))
                 .toList();
 
         Attendance workingAttendance = attendanceRepository
@@ -113,7 +115,7 @@ public class HomeService {
                 .findAllByStoreIdAndWorkDateBetweenOrderByCreatedAtDesc(storeId, today.minusDays(1), today)
                 .stream()
                 .limit(RECENT_HANDOVER_LIMIT)
-                .map(HandoverNoteResponse::from)
+                .map(note -> HandoverNoteResponse.from(note, profileImageUrls.of(note.getAuthor().getUser())))
                 .toList();
 
         return new MyDaySection(todayShifts,
