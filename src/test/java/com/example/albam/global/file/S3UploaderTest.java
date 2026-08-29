@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -81,6 +82,22 @@ class S3UploaderTest {
         assertThat(key).startsWith("profile-images/").endsWith("photo.png");
         assertThat(key).doesNotContain("amazonaws.com").doesNotContain("https://");
         verify(s3Client).putObject(any(PutObjectRequest.class), any(software.amazon.awssdk.core.sync.RequestBody.class));
+    }
+
+    /**
+     * 이 헤더가 없으면 브라우저가 사진마다 매번 서버에 물어본다. 키가 매번 새로 발급되어 같은
+     * 주소의 내용이 바뀌지 않으므로, 길게 캐시해도 낡은 사진이 남지 않는다.
+     */
+    @Test
+    void upload_marksTheImageCacheableForALongTime() throws IOException {
+        MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", realPngBytes());
+
+        s3Uploader.upload(file, "profile-images");
+
+        ArgumentCaptor<PutObjectRequest> request = ArgumentCaptor.forClass(PutObjectRequest.class);
+        verify(s3Client).putObject(request.capture(),
+                any(software.amazon.awssdk.core.sync.RequestBody.class));
+        assertThat(request.getValue().cacheControl()).contains("immutable");
     }
 
     @Test

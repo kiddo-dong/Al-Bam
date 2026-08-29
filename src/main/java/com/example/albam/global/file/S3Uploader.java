@@ -29,6 +29,17 @@ public class S3Uploader {
 
     private static final Set<String> ALLOWED_IMAGE_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/gif");
 
+    /**
+     * 브라우저가 이 이미지를 다시 받지 않도록 오래 캐시하게 한다.
+     *
+     * <p>이렇게 둘 수 있는 근거는 키에 UUID가 들어가 <b>같은 키를 다시 쓰는 경우가 없다는 것</b>이다.
+     * 사진을 바꾸면 새 키로 올리고 DB가 그쪽을 가리키므로, 낡은 내용이 캐시에 남아 보일 수 없다.
+     *
+     * <p>이 헤더가 없으면 S3도 캐시 지시를 주지 않아, 브라우저가 이미지마다 매번 서버에 물어본다.
+     * 내용은 안 받아도(304) 왕복은 그대로라, 멤버 목록처럼 사진이 여럿인 화면에서 그만큼 요청이 는다.
+     */
+    private static final String IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable";
+
     private final S3Client s3Client;
 
     @Value("${aws.s3.bucket-name}")
@@ -62,6 +73,7 @@ public class S3Uploader {
                         .bucket(bucketName)
                         .key(key)
                         .contentType(contentType)
+                        .cacheControl(IMMUTABLE_CACHE_CONTROL)
                         .build(),
                 RequestBody.fromBytes(content));
         return key;
