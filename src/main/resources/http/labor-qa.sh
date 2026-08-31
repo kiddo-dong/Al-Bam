@@ -43,9 +43,9 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
   "$BASE_URL/api/v1/labor-qa/ask" | python3 -m json.tool
 
 echo ""
-echo "== 2. 근거 없는 질문 (자료에 없으면 LLM을 부르지 않고 즉시 '자료 없음') =="
+echo "== 2. 범위 밖 질문 (근로·급여 밖이면 답하지 않고 안내만 한다) =="
 curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"question":"오늘 서울 날씨 어때?"}' \
+  -d '{"question":"김치찌개 맛있게 끓이는 법 알려줘"}' \
   "$BASE_URL/api/v1/labor-qa/ask" | python3 -m json.tool
 
 echo ""
