@@ -97,6 +97,17 @@ public class Store extends BaseTimeEntity {
     private LocalDateTime onboardingCompletedAt;
 
     /**
+     * 요금제. 지금은 모든 매장이 BASIC이고 이 값을 보는 기능이 아직 없다.
+     *
+     * <p>생성자로 받지 않고 기본값으로 두는 이유는, 매장을 만드는 쪽이 정할 값이 아니기 때문이다.
+     * 같은 이유로 CreateStoreRequest·UpdateStoreRequest에도 넣지 않았다 — 요청 본문으로 등급을
+     * 올릴 수 있으면 결제를 건너뛰는 길이 된다. 나중에 결제가 붙을 때 그쪽 경로에서만 바뀐다.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private StorePlan plan = StorePlan.BASIC;
+
+    /**
      * 삭제 표시 시각. null이 아니면 소프트 삭제된 것이고, {@code @SQLRestriction} 때문에 일반 조회에
      * 걸리지 않는다. 실제 행은 유예기간이 지난 뒤 {@code StorePurgeService}가 지운다.
      */
