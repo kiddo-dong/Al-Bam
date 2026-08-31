@@ -21,6 +21,9 @@ import com.example.albam.domain.user.repository.RefreshTokenRepository;
 import com.example.albam.domain.user.repository.UserRepository;
 import com.example.albam.global.exception.ConflictException;
 import com.example.albam.global.exception.EmailNotVerifiedException;
+import com.example.albam.domain.user.oauth.OAuthProfilePhotoImporter;
+import com.example.albam.domain.user.oauth.OAuthUserInfo;
+import com.example.albam.domain.user.oauth.OAuthUserInfoFetcher;
 import com.example.albam.global.mail.MailService;
 import com.example.albam.global.security.JwtTokenProvider;
 import java.time.LocalDate;
@@ -64,6 +67,10 @@ class AuthServiceSignupTest {
     @Mock
     private MailService mailService;
     @Mock
+    private OAuthProfilePhotoImporter oAuthProfilePhotoImporter;
+    @Mock
+    private OAuthUserInfoFetcher googleFetcher;
+    @Mock
     private PlatformTransactionManager transactionManager;
 
     private AuthService authService;
@@ -74,8 +81,8 @@ class AuthServiceSignupTest {
     @BeforeEach
     void setUp() {
         authService = new AuthService(userRepository, emailTokenRepository, refreshTokenRepository,
-                passwordEncoder, authenticationManager, jwtTokenProvider, List.of(), mailService,
-                transactionManager);
+                passwordEncoder, authenticationManager, jwtTokenProvider, List.of(googleFetcher),
+                mailService, oAuthProfilePhotoImporter, transactionManager);
         ReflectionTestUtils.setField(authService, "baseUrl", "http://localhost:8080");
         ReflectionTestUtils.setField(authService, "frontendUrl", "http://localhost:5173");
 
@@ -173,6 +180,26 @@ class AuthServiceSignupTest {
 
         assertThatThrownBy(() -> authService.signup(signupRequest()))
                 .isInstanceOf(ConflictException.class);
+    }
+
+    /** 이미 가입한 사람이 다시 로그인할 때 사진을 또 가져오면, 직접 올린 사진이 매번 되돌아간다. */
+    @Test
+    void oauthLoginDoesNotRefetchThePhotoForAnExistingAccount() {
+        User social = new User(EMAIL, "소셜", AuthProvider.GOOGLE, "google-1");
+        ReflectionTestUtils.setField(social, "id", 1L);
+        when(googleFetcher.getProvider()).thenReturn(AuthProvider.GOOGLE);
+        when(googleFetcher.fetch(anyString()))
+                .thenReturn(new OAuthUserInfo("google-1", EMAIL, "소셜", "https://provider/photo.png"));
+        when(userRepository.existsByProviderAndProviderId(AuthProvider.GOOGLE, "google-1")).thenReturn(true);
+        when(userRepository.findByProviderAndProviderId(AuthProvider.GOOGLE, "google-1"))
+                .thenReturn(Optional.of(social));
+        when(jwtTokenProvider.createAccessToken(any(), anyString())).thenReturn("access");
+        when(jwtTokenProvider.createRefreshToken(any(), anyString())).thenReturn("refresh");
+        when(jwtTokenProvider.getExpiresAt(anyString())).thenReturn(LocalDateTime.now().plusDays(14));
+
+        authService.oauthLogin(AuthProvider.GOOGLE, "provider-access-token");
+
+        verify(oAuthProfilePhotoImporter, never()).importFrom(anyString());
     }
 
     /**

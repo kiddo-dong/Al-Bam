@@ -60,6 +60,25 @@ public class S3Uploader {
         byte[] content;
         try {
             content = file.getBytes();
+        } catch (IOException e) {
+            throw new InvalidRequestException("파일을 읽을 수 없습니다.");
+        }
+        return store(content, contentType, file.getOriginalFilename(), directory);
+    }
+
+    /**
+     * 검증을 거쳐 실제로 저장한다. 바이트를 이미 손에 쥔 경로(소셜 로그인 프로필 사진 가져오기)도
+     * 같은 검증을 통과하도록 이 메서드를 함께 쓴다 — 검증이 업로드 경로마다 갈라지면 한쪽만
+     * 느슨해진다.
+     */
+    public String store(byte[] content, String contentType, String originalFilename, String directory) {
+        if (content == null || content.length == 0) {
+            throw new InvalidRequestException("업로드할 파일이 비어 있습니다.");
+        }
+        if (contentType == null || !ALLOWED_IMAGE_CONTENT_TYPES.contains(contentType)) {
+            throw new InvalidRequestException("이미지 파일(JPEG/PNG/GIF)만 업로드할 수 있습니다.");
+        }
+        try {
             if (ImageIO.read(new ByteArrayInputStream(content)) == null) {
                 throw new InvalidRequestException("올바른 이미지 파일이 아닙니다.");
             }
@@ -67,7 +86,7 @@ public class S3Uploader {
             throw new InvalidRequestException("파일을 읽을 수 없습니다.");
         }
 
-        String key = directory + "/" + UUID.randomUUID() + "-" + sanitizeFilename(file.getOriginalFilename());
+        String key = directory + "/" + UUID.randomUUID() + "-" + sanitizeFilename(originalFilename);
         s3Client.putObject(
                 PutObjectRequest.builder()
                         .bucket(bucketName)

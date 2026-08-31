@@ -9,6 +9,7 @@ import com.example.albam.domain.user.entity.EmailToken;
 import com.example.albam.domain.user.entity.EmailTokenType;
 import com.example.albam.domain.user.entity.RefreshToken;
 import com.example.albam.domain.user.entity.User;
+import com.example.albam.domain.user.oauth.OAuthProfilePhotoImporter;
 import com.example.albam.domain.user.oauth.OAuthUserInfo;
 import com.example.albam.domain.user.oauth.OAuthUserInfoFetcher;
 import com.example.albam.domain.user.repository.EmailTokenRepository;
@@ -57,6 +58,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final List<OAuthUserInfoFetcher> oAuthUserInfoFetchers;
     private final MailService mailService;
+    private final OAuthProfilePhotoImporter oAuthProfilePhotoImporter;
     private final PlatformTransactionManager transactionManager;
 
     @Value("${app.base-url}")
@@ -235,19 +237,40 @@ public class AuthService {
         return issueTokens(user);
     }
 
-    @Transactional
+    /**
+     * 소셜 로그인. 처음 보는 계정이면 가입까지 함께 처리한다.
+     *
+     * <p>이 메서드 자체는 트랜잭션이 아니다. 제공자 API 호출과 프로필 사진 내려받기가 여기서
+     * 일어나는데, 그 동안 DB 커넥션을 붙잡고 있지 않기 위해서다(가입 메일 발송과 같은 이유).
+     * DB를 건드리는 부분만 아래에서 따로 트랜잭션으로 묶는다.
+     */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public IssuedTokens oauthLogin(AuthProvider provider, String accessToken) {
         OAuthUserInfo userInfo = resolveFetcher(provider).fetch(accessToken);
-        User user = userRepository.findByProviderAndProviderId(provider, userInfo.providerId())
-                .orElseGet(() -> registerOAuthUser(provider, userInfo));
-        return issueTokens(user);
+
+        // 사진은 처음 가입할 때만 가져온다. 로그인할 때마다 덮어쓰면 사용자가 직접 올린 사진이
+        // 매번 소셜 사진으로 되돌아간다.
+        String profileImageKey =
+                userRepository.existsByProviderAndProviderId(provider, userInfo.providerId())
+                        ? null
+                        : oAuthProfilePhotoImporter.importFrom(userInfo.profileImageUrl());
+
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            User user = userRepository.findByProviderAndProviderId(provider, userInfo.providerId())
+                    .orElseGet(() -> registerOAuthUser(provider, userInfo, profileImageKey));
+            return issueTokens(user);
+        });
     }
 
-    private User registerOAuthUser(AuthProvider provider, OAuthUserInfo userInfo) {
+    private User registerOAuthUser(AuthProvider provider, OAuthUserInfo userInfo, String profileImageKey) {
         if (userRepository.existsByEmail(userInfo.email())) {
             throw new ConflictException("이미 다른 방식으로 가입된 이메일입니다.");
         }
-        return userRepository.save(new User(userInfo.email(), userInfo.name(), provider, userInfo.providerId()));
+        User user = new User(userInfo.email(), userInfo.name(), provider, userInfo.providerId());
+        if (profileImageKey != null) {
+            user.changeProfileImageKey(profileImageKey);
+        }
+        return userRepository.save(user);
     }
 
     private OAuthUserInfoFetcher resolveFetcher(AuthProvider provider) {

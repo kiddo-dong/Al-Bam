@@ -24,6 +24,8 @@ public class KakaoUserInfoFetcher implements OAuthUserInfoFetcher {
         JsonNode kakaoAccount = body.path("kakao_account");
         String email = kakaoAccount.path("email").asText();
         String name = kakaoAccount.path("profile").path("nickname").asText();
-        return new OAuthUserInfo(body.path("id").asText(), email, name);
+        String profileImageUrl = kakaoAccount.path("profile").path("profile_image_url").asText();
+        return new OAuthUserInfo(body.path("id").asText(), email, name,
+                emptyToNull(profileImageUrl));
     }
 }

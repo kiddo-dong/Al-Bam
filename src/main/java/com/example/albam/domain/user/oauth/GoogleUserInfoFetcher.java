@@ -22,6 +22,6 @@ public class GoogleUserInfoFetcher implements OAuthUserInfoFetcher {
     public OAuthUserInfo fetch(String accessToken) {
         JsonNode body = oAuthApiClient.getUserInfo(USERINFO_URI, accessToken);
         return new OAuthUserInfo(body.path("sub").asText(), body.path("email").asText(),
-                body.path("name").asText());
+                body.path("name").asText(), emptyToNull(body.path("picture").asText()));
     }
 }

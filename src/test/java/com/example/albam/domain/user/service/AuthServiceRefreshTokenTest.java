@@ -16,6 +16,7 @@ import com.example.albam.domain.user.repository.EmailTokenRepository;
 import com.example.albam.domain.user.repository.RefreshTokenRepository;
 import com.example.albam.domain.user.repository.UserRepository;
 import com.example.albam.global.exception.InvalidRequestException;
+import com.example.albam.domain.user.oauth.OAuthProfilePhotoImporter;
 import com.example.albam.global.mail.MailService;
 import com.example.albam.global.security.JwtTokenProvider;
 import java.time.LocalDateTime;
@@ -55,6 +56,8 @@ class AuthServiceRefreshTokenTest {
     @Mock
     private MailService mailService;
     @Mock
+    private OAuthProfilePhotoImporter oAuthProfilePhotoImporter;
+    @Mock
     private PlatformTransactionManager transactionManager;
 
     private AuthService authService;
@@ -69,7 +72,7 @@ class AuthServiceRefreshTokenTest {
     void setUp() {
         authService = new AuthService(userRepository, emailTokenRepository, refreshTokenRepository,
                 passwordEncoder, authenticationManager, jwtTokenProvider, List.of(), mailService,
-                transactionManager);
+                oAuthProfilePhotoImporter, transactionManager);
         user = new User("test@albam.dev", "테스트", AuthProvider.LOCAL, "provider-id");
         ReflectionTestUtils.setField(user, "id", 1L);
     }

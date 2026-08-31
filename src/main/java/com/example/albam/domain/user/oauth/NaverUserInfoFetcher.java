@@ -27,6 +27,7 @@ public class NaverUserInfoFetcher implements OAuthUserInfoFetcher {
         }
         JsonNode response = body.path("response");
         return new OAuthUserInfo(response.path("id").asText(), response.path("email").asText(),
-                response.path("name").asText());
+                response.path("name").asText(),
+                emptyToNull(response.path("profile_image").asText()));
     }
 }
