@@ -44,6 +44,11 @@ public class HandoverNote extends BaseTimeEntity {
     @Column(nullable = false)
     private LocalDate workDate;
 
+    public void update(String content, LocalDate workDate) {
+        this.content = content;
+        this.workDate = workDate;
+    }
+
     public HandoverNote(Store store, StoreMember author, String content, LocalDate workDate) {
         this.store = store;
         this.author = author;

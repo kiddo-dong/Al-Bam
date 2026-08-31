@@ -3,6 +3,8 @@ package com.example.albam.domain.user.controller;
 import com.example.albam.domain.user.dto.CompleteProfileRequest;
 import com.example.albam.domain.user.dto.UpdateUserRequest;
 import com.example.albam.domain.user.dto.UserResponse;
+import com.example.albam.domain.user.dto.ChangePasswordRequest;
+import com.example.albam.domain.user.service.AuthService;
 import com.example.albam.domain.user.service.UserService;
 import com.example.albam.global.common.ApiResponse;
 import com.example.albam.global.security.CurrentUserId;
@@ -24,6 +26,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class UserController {
 
     private final UserService userService;
+    /** 비밀번호 규칙과 세션 폐기가 모두 여기 있어, 경로만 /users/me 아래에 두고 처리는 위임한다. */
+    private final AuthService authService;
 
     @GetMapping
     public ApiResponse<UserResponse> getMe(@CurrentUserId Long userId) {
@@ -45,6 +49,14 @@ public class UserController {
     @DeleteMapping
     public ApiResponse<Void> withdraw(@CurrentUserId Long userId) {
         userService.withdraw(userId);
+        return ApiResponse.ok();
+    }
+
+    /** 로그인 상태에서 비밀번호 변경. 성공하면 모든 기기에서 로그아웃되므로 다시 로그인해야 한다. */
+    @PatchMapping("/password")
+    public ApiResponse<Void> changePassword(@CurrentUserId Long userId,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(userId, request);
         return ApiResponse.ok();
     }
 

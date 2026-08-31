@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -43,6 +44,14 @@ public class HandoverNoteController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return ApiResponse.success(handoverNoteService.getNotes(storeId, userId, from, to));
+    }
+
+    /** 수정 — 작성자 본인 또는 관리자. workDate를 생략하면 원래 날짜를 유지한다. */
+    @PatchMapping("/{noteId}")
+    public ApiResponse<HandoverNoteResponse> updateNote(@PathVariable Long storeId,
+            @PathVariable Long noteId, @CurrentUserId Long userId,
+            @Valid @RequestBody CreateHandoverNoteRequest request) {
+        return ApiResponse.success(handoverNoteService.updateNote(storeId, noteId, userId, request));
     }
 
     /** 삭제 — 작성자 본인 또는 관리자. */

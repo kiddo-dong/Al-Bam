@@ -135,9 +135,19 @@ public class User extends BaseTimeEntity {
         this.password = encodedPassword;
     }
 
-    public void updateProfile(String name, String phone) {
+    /**
+     * 프로필 수정.
+     *
+     * <p>생년월일은 값이 왔을 때만 바꾼다. 안 보냈다고 비워버리면 {@link #isProfileCompleted()}가
+     * false가 되어 그때부터 서비스 이용이 막히는데, 이름만 고치려던 사람에게 일어날 일은 아니다.
+     * (이름과 전화번호는 요청에서 필수라 항상 값이 있다.)
+     */
+    public void updateProfile(String name, String phone, LocalDate birthDate) {
         this.name = name;
         this.phone = phone;
+        if (birthDate != null) {
+            this.birthDate = birthDate;
+        }
     }
 
     public void changeProfileImageKey(String profileImageKey) {

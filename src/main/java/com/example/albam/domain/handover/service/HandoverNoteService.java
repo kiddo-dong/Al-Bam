@@ -41,15 +41,29 @@ public class HandoverNoteService {
                 .toList();
     }
 
+    /** 수정은 삭제와 같은 권한 — 작성자 본인 또는 관리자만. */
+    @Transactional
+    public HandoverNoteResponse updateNote(Long storeId, Long noteId, Long userId,
+            CreateHandoverNoteRequest request) {
+        HandoverNote note = requireEditableNote(storeId, noteId, userId, "수정");
+        note.update(request.content(),
+                request.workDate() == null ? note.getWorkDate() : request.workDate());
+        return HandoverNoteResponse.from(note, profileImageUrls.of(note.getAuthor().getUser()));
+    }
+
     /** 삭제는 작성자 본인 또는 관리자만. */
     @Transactional
     public void deleteNote(Long storeId, Long noteId, Long userId) {
+        handoverNoteRepository.delete(requireEditableNote(storeId, noteId, userId, "삭제"));
+    }
+
+    private HandoverNote requireEditableNote(Long storeId, Long noteId, Long userId, String action) {
         StoreMember me = storeAuthorizationService.requireMember(storeId, userId);
         HandoverNote note = handoverNoteRepository.findByIdAndStoreId(noteId, storeId)
                 .orElseThrow(() -> new NotFoundException("인수인계 노트를 찾을 수 없습니다."));
         if (!note.getAuthor().getId().equals(me.getId()) && !me.isOwnerOrManager()) {
-            throw new ForbiddenException("작성자 본인 또는 매장 관리자만 삭제할 수 있습니다.");
+            throw new ForbiddenException("작성자 본인 또는 매장 관리자만 " + action + "할 수 있습니다.");
         }
-        handoverNoteRepository.delete(note);
+        return note;
     }
 }

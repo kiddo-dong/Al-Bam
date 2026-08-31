@@ -1,5 +1,6 @@
 package com.example.albam.domain.user.service;
 
+import com.example.albam.domain.user.dto.ChangePasswordRequest;
 import com.example.albam.domain.user.dto.LoginRequest;
 import com.example.albam.domain.user.dto.PasswordResetConfirmRequest;
 import com.example.albam.domain.user.dto.SignupRequest;
@@ -206,6 +207,33 @@ public class AuthService {
         emailToken.markUsed();
         // 비밀번호를 바꾸는 이유 중 하나가 계정 탈취이므로, 기존 로그인 세션을 전부 끊는다.
         refreshTokenRepository.deleteByUserId(emailToken.getUser().getId());
+    }
+
+    /**
+     * 로그인한 사용자가 스스로 비밀번호를 바꾼다. 메일을 거치는 재설정과 달리 지금 비밀번호를 확인한다.
+     *
+     * <p>바꾸고 나면 그 사용자의 모든 세션을 끊는다. 비밀번호를 바꾸는 이유 중 하나가 남이 내 계정에
+     * 들어와 있는 것 같아서인데, 세션을 그대로 두면 정작 쫓아내야 할 쪽이 남는다. 본인도 다시
+     * 로그인해야 하지만, 그 편이 안전하다.
+     */
+    @Transactional
+    public void changePassword(Long userId, ChangePasswordRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new InvalidRequestException("사용자를 찾을 수 없습니다."));
+        if (user.getProvider() != AuthProvider.LOCAL || user.getPassword() == null) {
+            throw new InvalidRequestException(
+                    "소셜 로그인으로 가입한 계정은 비밀번호가 없습니다.");
+        }
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
+            throw new InvalidRequestException("현재 비밀번호가 올바르지 않습니다.");
+        }
+        if (!request.newPassword().equals(request.newPasswordConfirm())) {
+            throw new InvalidRequestException("비밀번호가 일치하지 않습니다.");
+        }
+        validatePasswordComplexity(request.newPassword());
+
+        user.changePassword(passwordEncoder.encode(request.newPassword()));
+        refreshTokenRepository.deleteByUserId(userId);
     }
 
     private void validatePasswordComplexity(String password) {

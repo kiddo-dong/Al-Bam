@@ -69,7 +69,7 @@ public class UserService {
             throw new ConflictException("이미 사용 중인 전화번호입니다.");
         }
         User user = getUser(userId);
-        user.updateProfile(request.name(), request.phone());
+        user.updateProfile(request.name(), request.phone(), request.birthDate());
         return toResponse(user);
     }
 

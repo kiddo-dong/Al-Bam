@@ -1,5 +1,6 @@
 package com.example.albam.domain.user.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -11,6 +12,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.albam.domain.user.dto.ChangePasswordRequest;
 import com.example.albam.domain.user.dto.LoginRequest;
 import com.example.albam.domain.user.dto.SignupRequest;
 import com.example.albam.domain.user.entity.AuthProvider;
@@ -21,6 +23,7 @@ import com.example.albam.domain.user.repository.RefreshTokenRepository;
 import com.example.albam.domain.user.repository.UserRepository;
 import com.example.albam.global.exception.ConflictException;
 import com.example.albam.global.exception.EmailNotVerifiedException;
+import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.domain.user.oauth.OAuthProfilePhotoImporter;
 import com.example.albam.domain.user.oauth.OAuthUserInfo;
 import com.example.albam.domain.user.oauth.OAuthUserInfoFetcher;
@@ -180,6 +183,81 @@ class AuthServiceSignupTest {
 
         assertThatThrownBy(() -> authService.signup(signupRequest()))
                 .isInstanceOf(ConflictException.class);
+    }
+
+    // ---------- 비밀번호 변경 ----------
+
+    private ChangePasswordRequest changeRequest(String current, String next) {
+        return new ChangePasswordRequest(current, next, next);
+    }
+
+    private User localUserWithPassword() {
+        User user = new User(EMAIL, "encoded-current", "테스트", PHONE,
+                LocalDate.of(1990, 1, 1), LocalDateTime.now());
+        ReflectionTestUtils.setField(user, "id", 1L);
+        return user;
+    }
+
+    @Test
+    void changePasswordReplacesThePassword() {
+        User user = localUserWithPassword();
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("Current1!", "encoded-current")).thenReturn(true);
+        when(passwordEncoder.encode("NewPass1!")).thenReturn("encoded-new");
+
+        authService.changePassword(1L, changeRequest("Current1!", "NewPass1!"));
+
+        assertThat(user.getPassword()).isEqualTo("encoded-new");
+    }
+
+    /** 자리를 비운 사이 열린 화면으로 남이 비밀번호를 바꾸는 것을 막는다. */
+    @Test
+    void changePasswordIsRejectedWhenTheCurrentOneIsWrong() {
+        User user = localUserWithPassword();
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.changePassword(1L, changeRequest("Wrong1!", "NewPass1!")))
+                .isInstanceOf(InvalidRequestException.class);
+        assertThat(user.getPassword()).isEqualTo("encoded-current");
+    }
+
+    /**
+     * 비밀번호를 바꾸는 이유 중 하나가 남이 들어와 있는 것 같아서다. 세션을 두면 정작 쫓아내야 할
+     * 쪽이 남는다.
+     */
+    @Test
+    void changePasswordEndsEverySession() {
+        User user = localUserWithPassword();
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
+        when(passwordEncoder.encode(anyString())).thenReturn("encoded-new");
+
+        authService.changePassword(1L, changeRequest("Current1!", "NewPass1!"));
+
+        verify(refreshTokenRepository).deleteByUserId(1L);
+    }
+
+    @Test
+    void changePasswordIsRejectedWhenTheTwoEntriesDiffer() {
+        User user = localUserWithPassword();
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.changePassword(1L,
+                new ChangePasswordRequest("Current1!", "NewPass1!", "Different1!")))
+                .isInstanceOf(InvalidRequestException.class);
+    }
+
+    /** 소셜 계정은 비밀번호가 없어 바꿀 것도 없다. */
+    @Test
+    void changePasswordIsRejectedForASocialAccount() {
+        User social = new User(EMAIL, "소셜", AuthProvider.GOOGLE, "google-1");
+        ReflectionTestUtils.setField(social, "id", 1L);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(social));
+
+        assertThatThrownBy(() -> authService.changePassword(1L, changeRequest("Current1!", "NewPass1!")))
+                .isInstanceOf(InvalidRequestException.class);
     }
 
     /** 이미 가입한 사람이 다시 로그인할 때 사진을 또 가져오면, 직접 올린 사진이 매번 되돌아간다. */
