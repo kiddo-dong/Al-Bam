@@ -6,10 +6,21 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface StoreMemberRepository extends JpaRepository<StoreMember, Long> {
 
-    Optional<StoreMember> findByStoreIdAndUserId(Long storeId, Long userId);
+    /**
+     * 매장 권한 검사의 관문.
+     *
+     * <p>파생 쿼리로 두면 store_id 컬럼만 보기 때문에, 소프트 삭제된 매장의 멤버도 그대로 찾아진다.
+     * 그러면 매장은 사라졌는데 권한 검사는 통과해, 지운 매장에 공지나 체크리스트가 계속 등록된다.
+     * store를 명시적으로 조인하면 Store에 걸린 @SQLRestriction이 적용되어 그런 행이 걸러진다.
+     */
+    @Query("select m from StoreMember m join m.store s where s.id = :storeId and m.user.id = :userId")
+    Optional<StoreMember> findByStoreIdAndUserId(@Param("storeId") Long storeId,
+            @Param("userId") Long userId);
 
     /**
      * 멤버 목록은 거의 항상 이름을 함께 보여준다(멤버 관리, 공지 읽음 현황, 주간 근무 현황, AI 초안).
