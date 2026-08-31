@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -42,6 +43,20 @@ public class StoreController {
     @GetMapping
     public ApiResponse<List<MyStoreResponse>> getMyStores(@CurrentUserId Long userId) {
         return ApiResponse.success(storeService.getMyStores(userId));
+    }
+
+    /** 매장 대표 사진 등록·교체 — OWNER 전용. */
+    @PostMapping("/{storeId}/profile-image")
+    public ApiResponse<StoreResponse> updateProfileImage(@PathVariable Long storeId,
+            @CurrentUserId Long userId, @RequestParam("image") MultipartFile image) {
+        return ApiResponse.success(storeService.updateProfileImage(storeId, userId, image));
+    }
+
+    /** 매장 대표 사진 삭제 — OWNER 전용. */
+    @DeleteMapping("/{storeId}/profile-image")
+    public ApiResponse<StoreResponse> deleteProfileImage(@PathVariable Long storeId,
+            @CurrentUserId Long userId) {
+        return ApiResponse.success(storeService.deleteProfileImage(storeId, userId));
     }
 
     @GetMapping("/{storeId}")

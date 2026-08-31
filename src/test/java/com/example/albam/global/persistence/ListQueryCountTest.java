@@ -103,7 +103,8 @@ class ListQueryCountTest {
 
         List<MyStoreResponse> stores = storeMemberRepository
                 .findAllByUserIdAndStatus(me.getId(), MemberStatus.ACTIVE).stream()
-                .map(MyStoreResponse::from)
+                // 실제 서비스와 같은 매핑 — 매장 사진 key까지 읽어야 조회 수가 같아진다.
+                .map(member -> MyStoreResponse.from(member, member.getStore().getProfileImageKey()))
                 .toList();
 
         assertThat(stores).hasSize(5);

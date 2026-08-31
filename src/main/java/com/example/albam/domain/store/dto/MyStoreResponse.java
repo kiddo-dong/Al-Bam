@@ -9,7 +9,8 @@ public record MyStoreResponse(
         Long myStoreMemberId,
         MemberRole myRole
 ) {
-    public static MyStoreResponse from(StoreMember member) {
-        return new MyStoreResponse(StoreResponse.from(member.getStore()), member.getId(), member.getRole());
+    public static MyStoreResponse from(StoreMember member, String storeProfileImageUrl) {
+        return new MyStoreResponse(StoreResponse.from(member.getStore(), storeProfileImageUrl),
+                member.getId(), member.getRole());
     }
 }

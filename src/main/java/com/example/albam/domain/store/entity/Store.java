@@ -96,6 +96,9 @@ public class Store extends BaseTimeEntity {
     /** 사장님이 온보딩을 마쳤다고 표시한 시각. 아직이면 null. */
     private LocalDateTime onboardingCompletedAt;
 
+    /** 매장 대표 사진의 S3 key (전체 URL이 아님). 공개 URL은 응답을 만들 때 조립한다. */
+    private String profileImageKey;
+
     /**
      * 요금제. 지금은 모든 매장이 BASIC이고 이 값을 보는 기능이 아직 없다.
      *
@@ -142,6 +145,10 @@ public class Store extends BaseTimeEntity {
         if (this.onboardingCompletedAt == null) {
             this.onboardingCompletedAt = LocalDateTime.now();
         }
+    }
+
+    public void changeProfileImageKey(String profileImageKey) {
+        this.profileImageKey = profileImageKey;
     }
 
     public void changeInviteCode(String inviteCode) {

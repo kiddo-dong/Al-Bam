@@ -9,6 +9,8 @@ public record JoinRequestResponse(
         Long id,
         Long storeId,
         String storeName,
+        /** 신청한 매장의 대표 사진 공개 URL. 등록하지 않았으면 null. */
+        String storeProfileImageUrl,
         Long userId,
         String userName,
         String userEmail,
@@ -19,11 +21,13 @@ public record JoinRequestResponse(
         LocalDateTime decidedAt,
         MemberRole decidedRole
 ) {
-    public static JoinRequestResponse from(JoinRequest joinRequest, String userProfileImageUrl) {
+    public static JoinRequestResponse from(JoinRequest joinRequest, String userProfileImageUrl,
+            String storeProfileImageUrl) {
         return new JoinRequestResponse(
                 joinRequest.getId(),
                 joinRequest.getStore().getId(),
                 joinRequest.getStore().getName(),
+                storeProfileImageUrl,
                 joinRequest.getUser().getId(),
                 joinRequest.getUser().getName(),
                 joinRequest.getUser().getEmail(),

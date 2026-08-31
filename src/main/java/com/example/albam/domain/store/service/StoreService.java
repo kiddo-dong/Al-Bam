@@ -18,6 +18,7 @@ import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.domain.user.entity.User;
 import com.example.albam.domain.user.repository.UserRepository;
 import com.example.albam.global.exception.InvalidRequestException;
+import com.example.albam.global.file.S3Uploader;
 import com.example.albam.global.exception.NotFoundException;
 import java.security.SecureRandom;
 import java.time.DayOfWeek;
@@ -26,7 +27,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -35,12 +39,15 @@ public class StoreService {
 
     private static final int OWNER_DEFAULT_WAGE = 0;
     private static final int INVITE_CODE_LENGTH = 6;
+    private static final String STORE_IMAGE_DIRECTORY = "store-images";
     private static final String INVITE_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ1234567890"; // 초대 코드 생성시 이 문자열에서 랜덤으로 뽑아 조합
 
     private final StoreRepository storeRepository;
     private final StoreMemberRepository storeMemberRepository;
     private final UserRepository userRepository;
     private final StoreAuthorizationService storeAuthorizationService;
+    private final S3Uploader s3Uploader;
+    private final PlatformTransactionManager transactionManager;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Transactional
@@ -52,7 +59,7 @@ public class StoreService {
                         request.category(), toBusinessHours(request.businessHours()), generateUniqueInviteCode(),
                         request.breakPolicy(), request.smallBusiness(), request.payday()));
         storeMemberRepository.save(new StoreMember(store, user, MemberRole.OWNER, OWNER_DEFAULT_WAGE));
-        return StoreResponse.from(store);
+        return toResponse(store);
     }
 
     public InviteCodeResponse getInviteCode(Long storeId, Long userId) {
@@ -70,13 +77,14 @@ public class StoreService {
 
     public List<MyStoreResponse> getMyStores(Long userId) {
         return storeMemberRepository.findAllByUserIdAndStatus(userId, MemberStatus.ACTIVE).stream()
-                .map(MyStoreResponse::from)
+                .map(member -> MyStoreResponse.from(member,
+                        s3Uploader.toPublicUrl(member.getStore().getProfileImageKey())))
                 .toList();
     }
 
     public StoreResponse getStore(Long storeId, Long userId) {
         storeAuthorizationService.requireMember(storeId, userId);
-        return StoreResponse.from(getStoreEntity(storeId));
+        return toResponse(getStoreEntity(storeId));
     }
 
     @Transactional
@@ -86,7 +94,7 @@ public class StoreService {
         store.update(request.name(), request.address(), request.businessRegistrationNumber(),
                 request.category(), toBusinessHours(request.businessHours()), request.breakPolicy(),
                 request.smallBusiness(), request.payday());
-        return StoreResponse.from(store);
+        return toResponse(store);
     }
 
     /**
@@ -132,6 +140,43 @@ public class StoreService {
                     "매장 이름이 일치하지 않습니다. 삭제하려면 매장 이름(" + store.getName() + ")을 정확히 입력해 주세요.");
         }
         store.softDelete();
+    }
+
+    /**
+     * 매장 대표 사진 교체. 사용자 프로필 사진과 같은 방식이다 — 새 사진을 먼저 올리고 DB가 그쪽을
+     * 가리키게 한 뒤, 커밋이 끝난 다음에 옛 파일을 지운다. 순서를 바꾸면 저장에 실패했을 때 이미
+     * 지워진 사진을 가리키게 된다.
+     *
+     * <p>S3 업로드는 트랜잭션 밖에서 한다. 파일을 주고받는 동안 DB 커넥션을 붙잡지 않기 위함이다.
+     */
+    public StoreResponse updateProfileImage(Long storeId, Long userId, MultipartFile image) {
+        storeAuthorizationService.requireOwner(storeId, userId);
+        String uploadedKey = s3Uploader.upload(image, STORE_IMAGE_DIRECTORY + "/" + storeId);
+        return replaceProfileImage(storeId, uploadedKey);
+    }
+
+    public StoreResponse deleteProfileImage(Long storeId, Long userId) {
+        storeAuthorizationService.requireOwner(storeId, userId);
+        return replaceProfileImage(storeId, null);
+    }
+
+    private StoreResponse replaceProfileImage(Long storeId, String newKey) {
+        String[] previousKeyHolder = new String[1];
+        StoreResponse response = new TransactionTemplate(transactionManager).execute(status -> {
+            Store store = getStoreEntity(storeId);
+            previousKeyHolder[0] = store.getProfileImageKey();
+            store.changeProfileImageKey(newKey);
+            return toResponse(store);
+        });
+        if (previousKeyHolder[0] != null) {
+            s3Uploader.delete(previousKeyHolder[0]);
+        }
+        return response;
+    }
+
+    /** 엔티티에는 S3 key만 있으므로, 응답을 만들 때 공개 URL로 조립한다. */
+    private StoreResponse toResponse(Store store) {
+        return StoreResponse.from(store, s3Uploader.toPublicUrl(store.getProfileImageKey()));
     }
 
     private Store getStoreEntity(Long storeId) {
