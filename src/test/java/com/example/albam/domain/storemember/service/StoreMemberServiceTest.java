@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
+import com.example.albam.domain.storemember.dto.StoreMemberResponse;
 import com.example.albam.domain.storemember.dto.UpdateStoreMemberRequest;
 import com.example.albam.domain.storemember.entity.MemberRole;
 import com.example.albam.domain.storemember.entity.MemberStatus;
@@ -73,7 +74,7 @@ class StoreMemberServiceTest {
     @Test
     void updateMember_managerCannotPromoteTargetToOwner() {
         UpdateStoreMemberRequest request = new UpdateStoreMemberRequest(
-                MemberRole.OWNER, null, null, null, null, null);
+                MemberRole.OWNER, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> storeMemberService.updateMember(STORE_ID, TARGET_MEMBER_ID, USER_ID, request))
                 .isInstanceOf(ForbiddenException.class)
@@ -90,16 +91,53 @@ class StoreMemberServiceTest {
         when(storeMemberRepository.findById(TARGET_MEMBER_ID)).thenReturn(Optional.of(ownerTarget));
 
         UpdateStoreMemberRequest request = new UpdateStoreMemberRequest(
-                null, 12_000, null, null, null, null);
+                null, null, 12_000, null, null, null, null);
 
         assertThatThrownBy(() -> storeMemberService.updateMember(STORE_ID, TARGET_MEMBER_ID, USER_ID, request))
                 .isInstanceOf(ForbiddenException.class);
     }
 
+    /** 직함은 권한과 무관한 표시용 값이다. 붙였다고 할 수 있는 일이 달라지면 안 된다. */
+    @Test
+    void updateMember_setsATitleWithoutTouchingTheRole() {
+        UpdateStoreMemberRequest request = new UpdateStoreMemberRequest(null, "주방장", null, null,
+                null, null, null);
+
+        StoreMemberResponse response = storeMemberService.updateMember(STORE_ID, TARGET_MEMBER_ID,
+                USER_ID, request);
+
+        assertThat(response.title()).isEqualTo("주방장");
+        assertThat(response.role()).isEqualTo(MemberRole.STAFF);
+    }
+
+    /** 화면에서 직함을 지웠을 때 공백만 남지 않도록 한다. */
+    @Test
+    void updateMember_clearsTheTitleWhenGivenBlank() {
+        storeMemberService.updateMember(STORE_ID, TARGET_MEMBER_ID, USER_ID,
+                new UpdateStoreMemberRequest(null, "홀팀장", null, null, null, null, null));
+
+        StoreMemberResponse response = storeMemberService.updateMember(STORE_ID, TARGET_MEMBER_ID,
+                USER_ID, new UpdateStoreMemberRequest(null, "  ", null, null, null, null, null));
+
+        assertThat(response.title()).isNull();
+    }
+
+    /** 직함을 안 보냈다고 지워지면, 시급만 고치려던 사람이 직함을 잃는다. */
+    @Test
+    void updateMember_keepsTheTitleWhenTheFieldIsAbsent() {
+        storeMemberService.updateMember(STORE_ID, TARGET_MEMBER_ID, USER_ID,
+                new UpdateStoreMemberRequest(null, "주방장", null, null, null, null, null));
+
+        StoreMemberResponse response = storeMemberService.updateMember(STORE_ID, TARGET_MEMBER_ID,
+                USER_ID, new UpdateStoreMemberRequest(null, null, 12000, null, null, null, null));
+
+        assertThat(response.title()).isEqualTo("주방장");
+    }
+
     @Test
     void updateMember_allowsPromotionToManager() {
         UpdateStoreMemberRequest request = new UpdateStoreMemberRequest(
-                MemberRole.MANAGER, null, null, null, null, null);
+                MemberRole.MANAGER, null, null, null, null, null, null);
 
         storeMemberService.updateMember(STORE_ID, TARGET_MEMBER_ID, USER_ID, request);
 
@@ -109,7 +147,7 @@ class StoreMemberServiceTest {
     @Test
     void updateMember_rejectsHourlyWageBelowMinimumWage() {
         UpdateStoreMemberRequest request = new UpdateStoreMemberRequest(
-                null, 5_000, null, null, null, null);
+                null, null, 5_000, null, null, null, null);
 
         assertThatThrownBy(() -> storeMemberService.updateMember(STORE_ID, TARGET_MEMBER_ID, USER_ID, request))
                 .isInstanceOf(InvalidRequestException.class)
@@ -119,7 +157,7 @@ class StoreMemberServiceTest {
     @Test
     void updateMember_appliesMultipleFieldChangesTogether() {
         UpdateStoreMemberRequest request = new UpdateStoreMemberRequest(
-                null, 12_000, MemberStatus.INACTIVE, null, null, TaxMode.WITHHOLDING_3_3);
+                null, null, 12_000, MemberStatus.INACTIVE, null, null, TaxMode.WITHHOLDING_3_3);
 
         storeMemberService.updateMember(STORE_ID, TARGET_MEMBER_ID, USER_ID, request);
 
@@ -166,7 +204,7 @@ class StoreMemberServiceTest {
         when(storeMemberRepository.findById(TARGET_MEMBER_ID)).thenReturn(Optional.of(memberOfOtherStore));
 
         UpdateStoreMemberRequest request = new UpdateStoreMemberRequest(
-                null, 12_000, null, null, null, null);
+                null, null, 12_000, null, null, null, null);
 
         assertThatThrownBy(() -> storeMemberService.updateMember(STORE_ID, TARGET_MEMBER_ID, USER_ID, request))
                 .isInstanceOf(com.example.albam.global.exception.NotFoundException.class);

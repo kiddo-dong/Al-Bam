@@ -9,10 +9,12 @@ public record StoreMemberSummaryResponse(
         String userName,
         /** 프로필 사진 공개 URL. 등록하지 않았으면 null. */
         String userProfileImageUrl,
-        MemberRole role
+        MemberRole role,
+        /** 매장이 부르는 직함. 안 정했으면 null. */
+        String title
 ) {
     public static StoreMemberSummaryResponse from(StoreMember member, String userProfileImageUrl) {
         return new StoreMemberSummaryResponse(member.getId(), member.getUser().getName(),
-                userProfileImageUrl, member.getRole());
+                userProfileImageUrl, member.getRole(), member.getTitle());
     }
 }

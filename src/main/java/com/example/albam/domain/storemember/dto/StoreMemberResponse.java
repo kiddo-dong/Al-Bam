@@ -16,6 +16,8 @@ public record StoreMemberResponse(
         /** 프로필 사진 공개 URL. 등록하지 않았으면 null. */
         String userProfileImageUrl,
         MemberRole role,
+        /** 매장이 부르는 직함. 안 정했으면 null이며, 그때는 역할 이름을 보여주면 된다. */
+        String title,
         int hourlyWage,
         MemberStatus status,
         LocalDateTime joinedAt,
@@ -33,6 +35,7 @@ public record StoreMemberResponse(
                 member.getUser().getEmail(),
                 userProfileImageUrl,
                 member.getRole(),
+                member.getTitle(),
                 member.getHourlyWage(),
                 member.getStatus(),
                 member.getJoinedAt(),

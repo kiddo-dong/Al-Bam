@@ -35,6 +35,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class StoreMember extends BaseTimeEntity {
 
+    /** 화면에 배지로 들어가는 값이라, 길면 목록이 무너진다. */
+    public static final int TITLE_MAX_LENGTH = 20;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -50,6 +53,16 @@ public class StoreMember extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private MemberRole role;
+
+    /**
+     * 매장이 부르는 직함. "주방장", "홀팀장"처럼 자유롭게 적는다. 안 정했으면 null.
+     *
+     * <p>권한과는 무관하다. 무엇을 할 수 있는지는 {@code role}만 결정하며, 이 값은 화면에 보이는
+     * 이름일 뿐이다. 둘을 섞으면 직함을 고치다 권한이 함께 바뀌어, 이름 하나 바꿨다가 급여 정보가
+     * 열리는 일이 생긴다.
+     */
+    @Column(length = TITLE_MAX_LENGTH)
+    private String title;
 
     @Column(nullable = false)
     private int hourlyWage;
@@ -91,6 +104,11 @@ public class StoreMember extends BaseTimeEntity {
 
     public void changeRole(MemberRole role) {
         this.role = role;
+    }
+
+    /** 빈 문자열은 "직함 없음"으로 본다 — 화면에서 지웠을 때 공백이 남지 않게 한다. */
+    public void changeTitle(String title) {
+        this.title = title == null || title.isBlank() ? null : title.strip();
     }
 
     public void changeHourlyWage(int hourlyWage) {

@@ -59,6 +59,10 @@ public class StoreMemberService {
             }
             target.changeRole(request.role());
         }
+        // 직함은 지울 수 있어야 하므로 빈 문자열도 받는다. null은 "안 보냄"이라 건드리지 않는다.
+        if (request.title() != null) {
+            target.changeTitle(request.title());
+        }
         if (request.hourlyWage() != null) {
             if (request.hourlyWage() < LaborStandards.MINIMUM_HOURLY_WAGE) {
                 throw new InvalidRequestException(
