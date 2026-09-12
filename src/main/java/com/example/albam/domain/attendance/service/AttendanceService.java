@@ -20,6 +20,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,7 +52,7 @@ public class AttendanceService {
                     request.breakMinutes());
             attendance.correctTimes(request.clockInAt(), request.clockOutAt(), breakMinutes);
         }
-        return AttendanceResponse.from(attendanceRepository.save(attendance),
+        return AttendanceResponse.from(saveUnlessAlreadyWorking(attendance),
                 profileImageUrls.of(target.getUser()));
     }
 
@@ -62,7 +63,7 @@ public class AttendanceService {
                 .ifPresent(a -> {
                     throw new InvalidRequestException("이미 출근 중입니다.");
                 });
-        Attendance attendance = attendanceRepository.save(new Attendance(member, LocalDateTime.now()));
+        Attendance attendance = saveUnlessAlreadyWorking(new Attendance(member, LocalDateTime.now()));
         return AttendanceResponse.from(attendance, profileImageUrls.of(attendance.getStoreMember().getUser()));
     }
 
@@ -123,5 +124,27 @@ public class AttendanceService {
         boolean statutory = member.getStore().getBreakPolicy() == BreakPolicy.STATUTORY;
         long spanMinutes = Duration.between(clockInAt, clockOutAt).toMinutes();
         return LaborStandards.resolveBreakMinutes(statutory, spanMinutes, requested);
+    }
+
+    /** V10이 건 유니크 제약의 이름. 다른 무결성 위반까지 "이미 출근 중"으로 바꿔버리지 않도록 이름으로 가린다. */
+    private static final String ONE_WORKING_CONSTRAINT = "uk_attendances_one_working";
+
+    /**
+     * 한 멤버에게 출근 중 기록은 하나뿐이어야 한다.
+     *
+     * <p>앞에서 하는 조회는 흔한 경우를 친절한 문구로 막을 뿐이다. 요청 두 개가 거의 동시에 오면 둘 다
+     * 조회를 통과하고, 그때는 DB의 유니크 제약이 두 번째 INSERT를 막는다. 그 위반을 여기서 같은 문구로
+     * 바꾼다. saveAndFlush로 이 자리에서 INSERT를 보내야 예외가 트랜잭션 커밋 때가 아니라 여기서 난다.
+     */
+    private Attendance saveUnlessAlreadyWorking(Attendance attendance) {
+        try {
+            return attendanceRepository.saveAndFlush(attendance);
+        } catch (DataIntegrityViolationException e) {
+            String cause = e.getMostSpecificCause().getMessage();
+            if (cause != null && cause.contains(ONE_WORKING_CONSTRAINT)) {
+                throw new InvalidRequestException("이미 출근 중인 기록이 있습니다.");
+            }
+            throw e;
+        }
     }
 }
