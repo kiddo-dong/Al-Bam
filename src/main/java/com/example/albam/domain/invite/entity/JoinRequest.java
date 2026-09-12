@@ -16,6 +16,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -50,6 +51,13 @@ public class JoinRequest extends BaseTimeEntity {
 
     @Enumerated(EnumType.STRING)
     private MemberRole decidedRole;
+
+    /**
+     * 낙관적 락 버전. 매니저 둘이 같은 신청을 동시에 승인·거절하면 늦게 저장한 쪽이 이 값이 달라진
+     * 것을 보고 실패한다. 없으면 나중 쪽이 앞의 결정을 조용히 덮어써, 거절됐는데 멤버가 생긴 상태가 남는다.
+     */
+    @Version
+    private Long version;
 
     public JoinRequest(Store store, User user) {
         this.store = store;

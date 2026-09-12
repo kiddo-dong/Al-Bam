@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.dao.OptimisticLockingFailureException;
 
 @Slf4j
 @RestControllerAdvice
@@ -74,6 +75,17 @@ public class GlobalExceptionHandler {
     }
 
     /** DB 무결성 위반 (동시 가입 등 unique 충돌, 참조 중인 데이터 삭제 시도). */
+    /**
+     * 낙관적 락 충돌 — 같은 데이터를 다른 사람이 먼저 바꿨다. 늦은 쪽의 변경은 이미 되돌아갔으므로,
+     * 화면을 새로 받아 결과를 확인하게 한다.
+     */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Void>> handleOptimisticLock(OptimisticLockingFailureException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error("다른 사람이 먼저 처리했어요. 새로고침한 뒤 다시 확인해 주세요.",
+                        ErrorCode.CONFLICT.name()));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException e) {
         log.warn("Data integrity violation", e);
