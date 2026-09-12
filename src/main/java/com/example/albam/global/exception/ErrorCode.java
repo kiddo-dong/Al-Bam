@@ -15,7 +15,10 @@ public enum ErrorCode {
     // 다음 행동이 정해져 있어(인증 메일 재발송 / 추가 정보 입력), 프론트가 그 화면으로 안내할 수
     // 있도록 코드로 구분한다. 메시지 문구로 분기하면 문구를 고칠 때마다 프론트가 깨진다.
     EMAIL_NOT_VERIFIED(HttpStatus.FORBIDDEN, "이메일 인증이 완료되지 않았습니다."),
-    PROFILE_INCOMPLETE(HttpStatus.FORBIDDEN, "추가 정보 입력이 완료되지 않았습니다.");
+    PROFILE_INCOMPLETE(HttpStatus.FORBIDDEN, "추가 정보 입력이 완료되지 않았습니다."),
+
+    // 같은 리프레시 토큰으로 온 두 요청 중 늦은 쪽. 쿠키는 이미 새 토큰이라 한 번 더 재발급하면 된다.
+    TOKEN_ALREADY_ROTATED(HttpStatus.CONFLICT, "다른 창에서 로그인이 먼저 갱신됐습니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;

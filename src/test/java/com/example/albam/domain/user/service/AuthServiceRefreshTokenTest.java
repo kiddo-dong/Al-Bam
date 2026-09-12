@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -16,6 +17,7 @@ import com.example.albam.domain.user.repository.EmailTokenRepository;
 import com.example.albam.domain.user.repository.RefreshTokenRepository;
 import com.example.albam.domain.user.repository.UserRepository;
 import com.example.albam.global.exception.InvalidRequestException;
+import com.example.albam.global.exception.TokenAlreadyRotatedException;
 import com.example.albam.domain.user.oauth.OAuthProfilePhotoImporter;
 import com.example.albam.global.mail.MailService;
 import com.example.albam.global.security.JwtTokenProvider;
@@ -75,6 +77,8 @@ class AuthServiceRefreshTokenTest {
                 oAuthProfilePhotoImporter, transactionManager);
         user = new User("test@albam.dev", "테스트", AuthProvider.LOCAL, "provider-id");
         ReflectionTestUtils.setField(user, "id", 1L);
+        // 기본은 삭제 경합에서 이긴 경우. 진 경우는 해당 테스트에서 따로 0을 준다.
+        lenient().when(refreshTokenRepository.deleteClaimed(any())).thenReturn(1);
     }
 
     private void givenTokenIsStructurallyValid() {
@@ -152,7 +156,7 @@ class AuthServiceRefreshTokenTest {
 
         authService.refresh(PRESENTED_TOKEN);
 
-        verify(refreshTokenRepository).delete(stored);
+        verify(refreshTokenRepository).deleteClaimed(stored.getId());
     }
 
     @Test
@@ -173,6 +177,23 @@ class AuthServiceRefreshTokenTest {
         assertThatThrownBy(() -> authService.refresh(PRESENTED_TOKEN))
                 .isInstanceOf(InvalidRequestException.class);
         verify(refreshTokenRepository, never()).findByTokenHash(anyString());
+    }
+
+    /**
+     * 같은 토큰을 두 탭이 동시에 쓰면 삭제는 한쪽만 성공한다. 진 쪽은 거절하되, 탈취로 보지 않으므로
+     * 세션을 전부 끊지는 않는다.
+     */
+    @Test
+    void refreshThatLosesTheRaceIsRefusedWithoutEndingOtherSessions() {
+        givenTokenIsStructurallyValid();
+        when(refreshTokenRepository.findByTokenHash(anyString()))
+                .thenReturn(Optional.of(new RefreshToken(user, "hash", LocalDateTime.now().plusDays(14))));
+        when(refreshTokenRepository.deleteClaimed(any())).thenReturn(0);
+
+        assertThatThrownBy(() -> authService.refresh(PRESENTED_TOKEN))
+                .isInstanceOf(TokenAlreadyRotatedException.class);
+        verify(refreshTokenRepository, never()).deleteByUserId(any());
+        verify(jwtTokenProvider, never()).createAccessToken(any(), anyString());
     }
 
     @Test

@@ -21,6 +21,7 @@ import com.example.albam.global.exception.EmailNotVerifiedException;
 import com.example.albam.global.exception.InvalidRequestException;
 import com.example.albam.global.mail.MailService;
 import com.example.albam.global.security.JwtTokenProvider;
+import com.example.albam.global.exception.TokenAlreadyRotatedException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -325,7 +326,12 @@ public class AuthService {
             throw new InvalidRequestException("만료되었거나 이미 사용된 로그인 정보입니다. 다시 로그인해 주세요.");
         }
 
-        refreshTokenRepository.delete(stored.get());
+        // 같은 토큰을 든 두 요청은 둘 다 위 조회에서 행을 찾는다. 삭제는 한쪽만 성공하므로 지운 행 수로
+        // 누가 이겼는지 가린다. 진 쪽은 거의 항상 같은 사람의 다른 탭이라, 나중에 들어온 재사용(위의 "없음")과
+        // 달리 탈취로 보지 않고 세션을 끊지 않는다.
+        if (refreshTokenRepository.deleteClaimed(stored.get().getId()) == 0) {
+            throw new TokenAlreadyRotatedException("다른 창에서 로그인이 먼저 갱신됐어요. 다시 시도해 주세요.");
+        }
         return issueTokens(stored.get().getUser());
     }
 
