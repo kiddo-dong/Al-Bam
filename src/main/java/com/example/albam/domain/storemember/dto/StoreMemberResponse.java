@@ -40,7 +40,9 @@ public record StoreMemberResponse(
                 member.getStatus(),
                 member.getJoinedAt(),
                 member.getResignedAt(),
-                member.getAvailableDays(),
+                // 엔티티의 컬렉션을 그대로 넘기면 Hibernate의 지연 컬렉션이 응답에 실린다. 그러면 JSON으로
+                // 바꾸는 시점(트랜잭션이 끝난 뒤)에 초기화하려다 실패한다. 여기서 복사해 트랜잭션 안에서 읽는다.
+                Set.copyOf(member.getAvailableDays()),
                 member.getWeeklyHolidayDay(),
                 member.getTaxMode()
         );
