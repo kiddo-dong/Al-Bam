@@ -68,9 +68,7 @@ public class NoticeService {
     public void markRead(Long storeId, Long noticeId, Long userId) {
         StoreMember me = storeAuthorizationService.requireMember(storeId, userId);
         Notice notice = getNoticeInStore(storeId, noticeId);
-        if (!noticeReadRepository.existsByNoticeIdAndStoreMemberId(notice.getId(), me.getId())) {
-            noticeReadRepository.save(new NoticeRead(notice, me));
-        }
+        noticeReadRepository.insertIfAbsent(notice.getId(), me.getId(), LocalDateTime.now());
     }
 
     /** 공지별 확인 현황: 재직 멤버 전원의 확인 여부·시각 (관리자용). */

@@ -13,6 +13,7 @@ import com.example.albam.domain.storemember.entity.StoreMember;
 import com.example.albam.domain.storemember.service.StoreAuthorizationService;
 import com.example.albam.global.exception.NotFoundException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -112,9 +113,7 @@ public class ChecklistService {
     public void check(Long storeId, Long itemId, Long userId, LocalDate date) {
         StoreMember me = storeAuthorizationService.requireMember(storeId, userId);
         ChecklistItem item = getItemInStore(storeId, itemId);
-        if (checklistCompletionRepository.findByItemIdAndWorkDate(item.getId(), date).isEmpty()) {
-            checklistCompletionRepository.save(new ChecklistCompletion(item, date, me));
-        }
+        checklistCompletionRepository.insertIfAbsent(item.getId(), date, me.getId(), LocalDateTime.now());
     }
 
     /** 체크 해제 (실수로 체크한 경우). */
