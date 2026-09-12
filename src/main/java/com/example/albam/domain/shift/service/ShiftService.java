@@ -29,9 +29,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 @Service
 @RequiredArgsConstructor
@@ -45,10 +47,10 @@ public class ShiftService {
     private final StoreMemberRepository storeMemberRepository;
     private final StoreAuthorizationService storeAuthorizationService;
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public ShiftResponse createShift(Long storeId, Long userId, CreateShiftRequest request) {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
-        StoreMember target = getStoreMemberInStore(storeId, request.storeMemberId());
+        StoreMember target = lockStoreMemberInStore(storeId, request.storeMemberId());
         int breakMinutes = validateAndResolveBreak(target, request.workDate(), request.startTime(),
                 request.endTime(), request.breakMinutes(), null);
         Shift shift = shiftRepository.save(
@@ -88,11 +90,11 @@ public class ShiftService {
         return breakMinutes;
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public RecurringShiftResult createRecurringShifts(Long storeId, Long userId,
             CreateRecurringShiftRequest request) {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
-        StoreMember target = getStoreMemberInStore(storeId, request.storeMemberId());
+        StoreMember target = lockStoreMemberInStore(storeId, request.storeMemberId());
         if (request.periodEnd().isBefore(request.periodStart())) {
             throw new InvalidRequestException("종료일은 시작일 이후여야 합니다.");
         }
@@ -141,10 +143,13 @@ public class ShiftService {
         return shifts.stream().map(shift -> ShiftResponse.from(shift, profileImageUrls.of(shift.getStoreMember().getUser()))).toList();
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public ShiftResponse updateShift(Long storeId, Long shiftId, Long userId, UpdateShiftRequest request) {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         Shift shift = getShiftInStore(storeId, shiftId);
+        // 겹침과 주간 상한을 다시 검사하기 전에 이 멤버의 스케줄 쓰기를 줄 세운다. 퇴사한 멤버의 스케줄도
+        // 취소는 할 수 있어야 하므로 재직 여부는 보지 않고 잠그기만 한다.
+        storeMemberRepository.findByIdForUpdate(shift.getStoreMember().getId());
         StoreMember member = shift.getStoreMember();
         int breakMinutes;
         if (request.status() == ShiftStatus.CANCELED) {
@@ -166,9 +171,29 @@ public class ShiftService {
         shiftRepository.delete(shift);
     }
 
+    /**
+     * 스케줄을 쓰기 전에 대상 멤버 행을 잠근다(SELECT ... FOR UPDATE).
+     *
+     * <p>겹침·주 52시간·연소자 주 40시간 검사는 모두 "기존 스케줄을 모아 보고 괜찮으면 새로 넣는"
+     * 방식이다. 두 요청이 동시에 오면 둘 다 검사를 통과하고 둘 다 넣어, 합치면 상한을 넘는 스케줄이
+     * 저장된다. 새 행끼리의 충돌이라 기존 행의 버전이 바뀌지 않으므로 낙관적 락으로는 잡히지 않는다.
+     * 그래서 멤버 한 명 단위로 스케줄 쓰기를 한 줄로 세운다.
+     *
+     * <p>이 락을 쓰는 트랜잭션은 반드시 READ COMMITTED여야 한다. MySQL 기본값인 REPEATABLE READ에서는
+     * 트랜잭션의 첫 조회(권한 확인)에서 스냅샷이 정해져, 락을 기다렸다 받은 뒤에도 앞 요청이 방금
+     * 커밋한 스케줄이 보이지 않는다. 락은 순서를 세우고, 격리 수준은 그 순서대로 결과가 보이게 한다.
+     * 둘 중 하나만 있으면 여전히 둘 다 저장된다 — ConcurrencyControlTest가 이를 확인한다.
+     */
+    private StoreMember lockStoreMemberInStore(Long storeId, Long storeMemberId) {
+        return requireAssignable(storeId, storeMemberRepository.findByIdForUpdate(storeMemberId));
+    }
+
     private StoreMember getStoreMemberInStore(Long storeId, Long storeMemberId) {
-        StoreMember member = storeMemberRepository.findById(storeMemberId)
-                .orElseThrow(() -> new NotFoundException("멤버를 찾을 수 없습니다."));
+        return requireAssignable(storeId, storeMemberRepository.findById(storeMemberId));
+    }
+
+    private StoreMember requireAssignable(Long storeId, Optional<StoreMember> found) {
+        StoreMember member = found.orElseThrow(() -> new NotFoundException("멤버를 찾을 수 없습니다."));
         if (!member.getStore().getId().equals(storeId)) {
             throw new InvalidRequestException("해당 매장의 멤버가 아닙니다.");
         }

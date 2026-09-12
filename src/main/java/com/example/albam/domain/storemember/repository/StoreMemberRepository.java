@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 
 public interface StoreMemberRepository extends JpaRepository<StoreMember, Long> {
 
@@ -38,6 +40,14 @@ public interface StoreMemberRepository extends JpaRepository<StoreMember, Long> 
      */
     @EntityGraph(attributePaths = {"store"})
     List<StoreMember> findAllByUserIdAndStatus(Long userId, MemberStatus status);
+
+    /**
+     * 스케줄을 쓰기 전에 그 멤버 행을 잠근다(SELECT ... FOR UPDATE). 같은 멤버의 스케줄 쓰기를 한 줄로
+     * 세우는 용도이며, 다른 멤버의 작업은 막지 않는다. 쓰는 쪽은 ShiftService의 lockStoreMemberInStore.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select m from StoreMember m where m.id = :id")
+    Optional<StoreMember> findByIdForUpdate(@Param("id") Long id);
 
     boolean existsByStoreIdAndUserIdAndStatus(Long storeId, Long userId, MemberStatus status);
 

@@ -61,6 +61,15 @@ class ShiftServiceTest {
 
     private StoreMember adultMember;
 
+    /**
+     * 스케줄을 쓰는 경로는 멤버를 잠그며 읽고(findByIdForUpdate), 검증만 하는 경로는 그냥 읽는다(findById).
+     * 테스트가 어느 경로를 타든 같은 멤버가 나오도록 둘 다 건다.
+     */
+    private void givenMember(StoreMember member) {
+        lenient().when(storeMemberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        lenient().when(storeMemberRepository.findByIdForUpdate(MEMBER_ID)).thenReturn(Optional.of(member));
+    }
+
     @BeforeEach
     void setUp() {
         Store store = store(Map.of(), BreakPolicy.STATUTORY, false);
@@ -71,7 +80,7 @@ class ShiftServiceTest {
 
         lenient().when(storeAuthorizationService.requireOwnerOrManager(anyLong(), anyLong()))
                 .thenReturn(adultMember);
-        lenient().when(storeMemberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(adultMember));
+        givenMember(adultMember);
         lenient().when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
         lenient()
                 .when(shiftRepository.findAllByStoreMemberIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(
@@ -140,7 +149,7 @@ class ShiftServiceTest {
                 LocalDate.of(2010, 1, 1), null); // 2026년 기준 16세
         StoreMember minorMember = new StoreMember(store, minor, MemberRole.STAFF, 10_000);
         ReflectionTestUtils.setField(minorMember, "id", MEMBER_ID);
-        when(storeMemberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(minorMember));
+        givenMember(minorMember);
 
         CreateShiftRequest request = new CreateShiftRequest(MEMBER_ID, MONDAY,
                 LocalTime.of(18, 0), LocalTime.of(23, 0), 30); // 22시 이후까지 근무
@@ -157,7 +166,7 @@ class ShiftServiceTest {
                 LocalDate.of(2010, 1, 1), null);
         StoreMember minorMember = new StoreMember(store, minor, MemberRole.STAFF, 10_000);
         ReflectionTestUtils.setField(minorMember, "id", MEMBER_ID);
-        when(storeMemberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(minorMember));
+        givenMember(minorMember);
 
         CreateShiftRequest request = new CreateShiftRequest(MEMBER_ID, MONDAY,
                 LocalTime.of(8, 0), LocalTime.of(17, 0), 60); // 실근무 8시간, 연소자 상한(7h) 초과
@@ -187,7 +196,7 @@ class ShiftServiceTest {
                 LocalDate.of(1990, 1, 1), null);
         StoreMember member = new StoreMember(store, adult, MemberRole.STAFF, 10_000);
         ReflectionTestUtils.setField(member, "id", MEMBER_ID);
-        when(storeMemberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        givenMember(member);
 
         CreateShiftRequest request = new CreateShiftRequest(MEMBER_ID, MONDAY,
                 LocalTime.of(9, 0), LocalTime.of(18, 0), 60);
@@ -205,7 +214,7 @@ class ShiftServiceTest {
                 LocalDate.of(1990, 1, 1), null);
         StoreMember member = new StoreMember(store, adult, MemberRole.STAFF, 10_000);
         ReflectionTestUtils.setField(member, "id", MEMBER_ID);
-        when(storeMemberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        givenMember(member);
 
         CreateShiftRequest request = new CreateShiftRequest(MEMBER_ID, MONDAY,
                 LocalTime.of(7, 0), LocalTime.of(12, 0), 30); // 영업 시작(9시) 전부터 근무
@@ -222,7 +231,7 @@ class ShiftServiceTest {
                 LocalDate.of(1990, 1, 1), null);
         StoreMember member = new StoreMember(store, adult, MemberRole.STAFF, 10_000);
         ReflectionTestUtils.setField(member, "id", MEMBER_ID);
-        when(storeMemberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        givenMember(member);
 
         CreateShiftRequest request = new CreateShiftRequest(MEMBER_ID, MONDAY.plusDays(6),
                 LocalTime.of(9, 0), LocalTime.of(15, 0), 30);

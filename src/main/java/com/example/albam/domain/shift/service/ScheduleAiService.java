@@ -29,7 +29,6 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -128,7 +127,14 @@ public class ScheduleAiService {
     }
 
     /** 사용자가 확인(수정 가능)한 초안을 실제로 저장한다. 여기서도 각 항목은 ShiftService.createShift를 그대로 통과해야 한다. */
-    @Transactional
+    /**
+     * 초안 확정. 항목마다 따로 저장하고, 규칙에 걸린 항목은 거절 목록에 담아 돌려준다.
+     *
+     * <p>이 메서드는 일부러 트랜잭션을 두지 않는다. 하나로 묶으면 createShift가 그 트랜잭션에 합류해,
+     * 거절된 항목이 던진 예외가 전체를 롤백 전용으로 표시한다. 여기서 예외를 잡고 계속 진행해도 커밋
+     * 순간 전부 되돌아가, 통과한 항목까지 저장되지 않고 500이 났다. 항목마다 트랜잭션이 따로면 거절은
+     * 그 항목만 되돌리고, 멤버별 스케줄 락도 항목이 끝날 때마다 풀려 여러 멤버의 락이 쌓이지 않는다.
+     */
     public ConfirmScheduleDraftResult confirmDraft(Long storeId, Long userId, ConfirmScheduleDraftRequest request) {
         storeAuthorizationService.requireOwnerOrManager(storeId, userId);
         List<ShiftResponse> created = new ArrayList<>();
