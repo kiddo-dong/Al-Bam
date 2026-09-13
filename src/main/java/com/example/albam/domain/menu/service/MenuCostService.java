@@ -37,9 +37,12 @@ public class MenuCostService {
         return createIngredientFor(manager.getStore(), request);
     }
 
-    /** 매장 소유권 확인이 이미 끝난 배치 등록용(엑셀 임포트 등) — 항목마다 권한 재조회하지 않는다. */
-    @Transactional
-    public MenuIngredientResponse createIngredientFor(Store store, MenuIngredientRequest request) {
+    /**
+     * 권한 확인 없이 저장만 한다. 호출하는 쪽이 이미 확인을 마쳤다는 전제라 밖으로 열어두지 않는다 —
+     * 원래는 엑셀 가져오기가 한 번 확인한 뒤 여러 건을 넣는 통로였는데, 그 기능이 빠진 뒤로 public으로
+     * 남아 있으면 권한 검사를 건너뛰는 입구가 될 뿐이다.
+     */
+    private MenuIngredientResponse createIngredientFor(Store store, MenuIngredientRequest request) {
         MenuIngredient ingredient = menuIngredientRepository.save(new MenuIngredient(store,
                 request.name(), request.productInfo(), request.price(), request.packageQty(),
                 request.unit(), request.lossRate(), request.category()));
