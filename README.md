@@ -123,7 +123,7 @@ GMAIL_USERNAME=...  GMAIL_APP_PASSWORD=...
 선택 — 없으면 해당 기능만 동작하지 않는다.
 
 ```bash
-OPENAI_API_KEY=...          # AI 상담·스케줄 초안·원가표 임포트
+OPENAI_API_KEY=...          # AI 상담·스케줄 초안
 VECTOR_DB_PASSWORD=...      # AI 상담
 ADMIN_INGEST_TOKEN=...      # 없으면 지식베이스 적재 API 자체가 닫힌다
 SWAGGER_ENABLED=true        # API 문서. 기본은 꺼져 있다
