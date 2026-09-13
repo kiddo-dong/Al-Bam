@@ -90,7 +90,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException e) {
         log.warn("Data integrity violation", e);
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiResponse.error("이미 존재하거나 다른 데이터가 참조 중이어서 처리할 수 없습니다."));
+                // 409는 모두 같은 코드로 내보낸다. 두 매니저가 같은 신청을 동시에 승인하면 버전 확인보다
+                // 유니크 제약이 먼저 걸리는데, 그때 코드가 비어 있으면 화면이 목록을 새로 받지 못한다.
+                .body(ApiResponse.error("이미 존재하거나 다른 데이터가 참조 중이어서 처리할 수 없습니다.",
+                        ErrorCode.CONFLICT.name()));
     }
 
     @ExceptionHandler(Exception.class)
